@@ -36,8 +36,8 @@ def getDataframe(dataset = 'movielens', size = 'S'):
     DATASET_WITH_SIZE = ['movielens'] 
     SIZE = ['S', 'M', 'L']
     
-    USER_ID= 'user_id'
-    ITEM_ID= 'item_id'
+    USER_ID = 'user_id'
+    ITEM_ID = 'item_id'
     RATING = 'rating'
     TIMESTAMP = 'timestamp'
     
