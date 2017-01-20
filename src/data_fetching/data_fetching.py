@@ -6,6 +6,11 @@ from io import BytesIO
 from zipfile import ZipFile
 from urllib.request import urlopen
 
+USER_ID = 'user_id'
+ITEM_ID = 'item_id'
+RATING = 'rating'
+TIMESTAMP = 'timestamp'
+
 def getDataframe(dataset = 'movielens', size = 'S'):
     """
     @Parameters:
@@ -35,12 +40,7 @@ def getDataframe(dataset = 'movielens', size = 'S'):
     DATASETS = ['movielens', 'jester']
     DATASET_WITH_SIZE = ['movielens'] 
     SIZE = ['S', 'M', 'L']
-    
-    USER_ID = 'user_id'
-    ITEM_ID = 'item_id'
-    RATING = 'rating'
-    TIMESTAMP = 'timestamp'
-    
+        
     # Check inputs
     if dataset not in DATASETS:
         raise NameError("This dataset is not allowed.")
@@ -89,7 +89,6 @@ def getDataframe(dataset = 'movielens', size = 'S'):
             'unique': '\t\t'
         }
 
-
         columns_map = {
             'unique': [USER_ID, ITEM_ID, RATING],
         }
@@ -103,6 +102,41 @@ def getDataframe(dataset = 'movielens', size = 'S'):
     df = df[[USER_ID, ITEM_ID, RATING]]
     
     return df
+
+def getDataframe_toy(u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=0.3, score_low=0, score_high=5, out='dataframe'):
+    # Array of user, there are u users, each user has a type from (0, 1, ..., u_unique - 1)
+    X = np.random.randint(u_unique, size=u)
+    # Array of item, there are i items, each item has a type from (0, 1, ..., i_unique - 1)
+    Y = np.random.randint(i_unique, size=i)
+    
+    # To get the rating between user u (type tu) and item i (type ti), we build a matrix that 
+    # associates a random rating between all types tu and ti
+    rating_unique_matrix = np.random.randint(low=score_low, high=score_high + 1, size=(u_unique, i_unique))
+        
+    # We then build the rating matrix
+    # Each ratings is r_hat(i,j) = r(i,j) + N(0, noise)
+    ratings = np.clip(
+                      np.fromfunction(
+                                      np.vectorize(lambda i, j: rating_unique_matrix[X[i]][Y[j]] + (np.random.normal(0, noise) if noise > 0 else 0)),
+                                      (u, i), 
+                                      dtype=int
+                                     ), 
+                      score_low, 
+                      score_high)
+    
+    # We apply the density parameter
+    ratings_nan = np.where(np.random.binomial(2, density, size=(u, i)) == 0, np.nan, 1)*ratings
+    
+    if out == 'matrix':
+        return ratings_nan
+    
+    not_nan_index = np.argwhere(~np.isnan(ratings_nan))
+    df = pd.DataFrame(not_nan_index)
+    df.columns = [USER_ID, ITEM_ID]
+    df[RATING] = df.apply(lambda row: ratings_nan[row[USER_ID]][row[ITEM_ID]], axis = 1)
+                              
+    return df
+    
 
 def fromDFtoDenseMatrix(df):
     """
