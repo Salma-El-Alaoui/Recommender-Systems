@@ -104,6 +104,33 @@ def getDataframe(dataset = 'movielens', size = 'S'):
     return df
 
 def getDataframe_toy(u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=0.3, score_low=0, score_high=5, out='dataframe'):
+    """
+    @Parameters:
+    ------------
+    u:           Integer   -- Number of users
+    i:           Integer   -- Number of items
+    u_unique:    Integer   -- Number of user's type
+    i_unique:    Integer   -- Number of item's type 
+    density:     Float     -- Percentage of non-nan values
+    noise:       Float     -- Each rating is r_hat(i,j) = r(i,j) + N(0, noise) where N is the Gaussian distribution
+    score_low:   Integer   -- The minimum rating
+    score_high:  Integer   -- The maximum rating
+    out:         String    -- 'matrix' of 'dataframe'
+
+    @Return:
+    --------
+    df:          DataFrame -- columns = UserId || ItemId || Rating
+    OR 
+    matrix:      nparray   -- with some nan values depending on density parameter
+
+    @Infos:
+    -------
+    We consider that each user u has a definite (and random) type t_user(u), from (0, 1, 2, ..., u_unique - 1), 
+    that caracterizes the user. Each item i has a definite type t_item(i) too, from (0, 1, ..., i_unique - 1). 
+    We then pick a rating r(t_user, t_item) from Unif(score_low, score_high) for all tuples (t_user, t_item). 
+    All rating r_hat(i, j) = r_hat(t_user(i), t_item(i)) = r(t_user(i), t_item(i)) + N(0, noise) where N is the 
+    Gaussian distribution.
+    """
     # Array of user, there are u users, each user has a type from (0, 1, ..., u_unique - 1)
     X = np.random.randint(u_unique, size=u)
     # Array of item, there are i items, each item has a type from (0, 1, ..., i_unique - 1)
@@ -115,28 +142,35 @@ def getDataframe_toy(u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=
         
     # We then build the rating matrix
     # Each ratings is r_hat(i,j) = r(i,j) + N(0, noise)
-    ratings = np.clip(
-                      np.fromfunction(
-                                      np.vectorize(lambda i, j: rating_unique_matrix[X[i]][Y[j]] + (np.random.normal(0, noise) if noise > 0 else 0)),
-                                      (u, i), 
-                                      dtype=int
-                                     ), 
+    ratings = np.round(
+                np.clip(
+                  np.fromfunction(
+                                  np.vectorize(lambda i, j: rating_unique_matrix[X[i]][Y[j]] + (np.random.normal(0, noise) if noise > 0 else 0)),
+                                  (u, i),
+                                  dtype=int
+                                 ), 
                       score_low, 
-                      score_high)
+                      score_high
+                       ), 
+                     2)
     
     # We apply the density parameter
     ratings_nan = np.where(np.random.binomial(2, density, size=(u, i)) == 0, np.nan, 1)*ratings
     
     if out == 'matrix':
-        return ratings_nan
+        return ratings, ratings_nan
     
     not_nan_index = np.argwhere(~np.isnan(ratings_nan))
-    df = pd.DataFrame(not_nan_index)
-    df.columns = [USER_ID, ITEM_ID]
-    df[RATING] = df.apply(lambda row: ratings_nan[row[USER_ID]][row[ITEM_ID]], axis = 1)
-                              
-    return df
+    df_nan = pd.DataFrame(not_nan_index)
+    df_nan.columns = [USER_ID, ITEM_ID]
+    df_nan[RATING] = df_nan.apply(lambda row: ratings_nan[row[USER_ID]][row[ITEM_ID]], axis = 1)
+
     
+    df = pd.DataFrame([[user, item] for user in range(u) for item in range(i)])
+    df.columns = [USER_ID, ITEM_ID]
+    df[RATING] = df.apply(lambda row: ratings[row[USER_ID]][row[ITEM_ID]], axis = 1)
+                              
+    return df, df_nan
 
 def fromDFtoDenseMatrix(df):
     """
@@ -146,7 +180,7 @@ def fromDFtoDenseMatrix(df):
     
     @Return:
     --------
-    res:   Dense nparray, 
+    res:   Dense Dataframe, 
            shape = (# user_id, # item_id), 
            element[i][j] = rating for user_id[i], item_id[j]  if rating exists
                            nan.                               otherwise
@@ -156,14 +190,13 @@ def fromDFtoDenseMatrix(df):
     res = np.nan*np.zeros((user_id_max + 1, item_id_max + 1))
     for row in df.values:
         res[row[0]][row[1]] = row[2]
-    return res
+    return pd.DataFrame(res)
 
 def getDataframes_CV():
     """
     @Parameters:
     ------------
     None for now...
-    
     
     @Return:
     --------
