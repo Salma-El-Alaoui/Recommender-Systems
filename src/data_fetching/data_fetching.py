@@ -142,14 +142,17 @@ def getDataframe_toy(u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=
         
     # We then build the rating matrix
     # Each ratings is r_hat(i,j) = r(i,j) + N(0, noise)
-    ratings = np.clip(
-                      np.fromfunction(
-                                      np.vectorize(lambda i, j: rating_unique_matrix[X[i]][Y[j]] + (np.random.normal(0, noise) if noise > 0 else 0)),
-                                      (u, i), 
-                                      dtype=int
-                                     ), 
+    ratings = np.round(
+                np.clip(
+                  np.fromfunction(
+                                  np.vectorize(lambda i, j: rating_unique_matrix[X[i]][Y[j]] + (np.random.normal(0, noise) if noise > 0 else 0)),
+                                  (u, i),
+                                  dtype=int
+                                 ), 
                       score_low, 
-                      score_high)
+                      score_high
+                       ), 
+                     2)
     
     # We apply the density parameter
     ratings_nan = np.where(np.random.binomial(2, density, size=(u, i)) == 0, np.nan, 1)*ratings
@@ -194,7 +197,6 @@ def getDataframes_CV():
     @Parameters:
     ------------
     None for now...
-    
     
     @Return:
     --------
