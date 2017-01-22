@@ -180,7 +180,7 @@ def fromDFtoDenseMatrix(df):
     
     @Return:
     --------
-    res:   Dense nparray, 
+    res:   Dense Dataframe, 
            shape = (# user_id, # item_id), 
            element[i][j] = rating for user_id[i], item_id[j]  if rating exists
                            nan.                               otherwise
@@ -190,7 +190,7 @@ def fromDFtoDenseMatrix(df):
     res = np.nan*np.zeros((user_id_max + 1, item_id_max + 1))
     for row in df.values:
         res[row[0]][row[1]] = row[2]
-    return res
+    return pd.DataFrame(res)
 
 def getDataframes_CV():
     """
