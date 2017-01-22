@@ -5,12 +5,14 @@ import numpy as np
 from io import BytesIO
 from zipfile import ZipFile
 from urllib.request import urlopen
+from functools import lru_cache
 
 USER_ID = 'user_id'
 ITEM_ID = 'item_id'
 RATING = 'rating'
 TIMESTAMP = 'timestamp'
 
+@lru_cache(maxsize=256)
 def getDataframe(dataset = 'movielens', size = 'S'):
     """
     @Parameters:
@@ -192,6 +194,7 @@ def fromDFtoDenseMatrix(df):
         res[row[0]][row[1]] = row[2]
     return pd.DataFrame(res)
 
+@lru_cache(maxsize=256)
 def getDataframes_CV():
     """
     @Parameters:
