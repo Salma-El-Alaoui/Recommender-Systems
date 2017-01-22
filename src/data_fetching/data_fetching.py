@@ -6,6 +6,7 @@ from io import BytesIO
 from zipfile import ZipFile
 from urllib.request import urlopen
 from functools import lru_cache
+from pathlib import Path
 
 USER_ID = 'user_id'
 ITEM_ID = 'item_id'
@@ -96,10 +97,15 @@ def getDataframe(dataset = 'movielens', size = 'S'):
         }
                 
     # Load data in memory
-    url = urlopen(url_map[size])
-    zipfile = ZipFile(BytesIO(url.read()))
-    unzipfile  = io.TextIOWrapper(zipfile.open(filename_map[size], 'r'))
-    df = pd.read_csv(unzipfile, sep=separator_map[size], header=None)
+    csv_ondisk = Path("../../csv/" + filename_map[size])
+    if csv_ondisk.is_file():
+        df = pd.read_csv(csv_ondisk, sep=separator_map[size], header=None)
+    else:
+        url = urlopen(url_map[size])
+        zipfile = ZipFile(BytesIO(url.read()))
+        unzipfile  = io.TextIOWrapper(zipfile.open(filename_map[size], 'r'))
+        df = pd.read_csv(unzipfile, sep=separator_map[size], header=None)
+
     df.columns = columns_map[size]
     df = df[[USER_ID, ITEM_ID, RATING]]
     
