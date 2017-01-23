@@ -124,13 +124,11 @@ def getDataframe_toy(u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=
     score_low:   Integer   -- The minimum rating
     score_high:  Integer   -- The maximum rating
     out:         String    -- 'matrix' of 'dataframe'
-
     @Return:
     --------
     df:          DataFrame -- columns = UserId || ItemId || Rating
     OR 
     matrix:      nparray   -- with some nan values depending on density parameter
-
     @Infos:
     -------
     We consider that each user u has a definite (and random) type t_user(u), from (0, 1, 2, ..., u_unique - 1), 
@@ -188,7 +186,7 @@ def fromDFtoDenseMatrix(df):
     
     @Return:
     --------
-    res:   Dense Dataframe, 
+    res:   Dense nparray, 
            shape = (# user_id, # item_id), 
            element[i][j] = rating for user_id[i], item_id[j]  if rating exists
                            nan.                               otherwise
@@ -198,7 +196,7 @@ def fromDFtoDenseMatrix(df):
     res = np.nan*np.zeros((user_id_max + 1, item_id_max + 1))
     for row in df.values:
         res[row[0]][row[1]] = row[2]
-    return pd.DataFrame(res)
+    return res
 
 @lru_cache(maxsize=256)
 def getDataframes_CV():
