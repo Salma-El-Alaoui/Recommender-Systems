@@ -9,10 +9,10 @@ PACKAGE_PARENT = '..'
 SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
-from data_fetching.data_fetching import USER_ID, ITEM_ID, RATING, getDataframe, fromDFtoDenseMatrix, getDataframe_toy
+from data_fetching.data_set import DataSet
 
 
-class gp_mf():
+class GpMf():
     def __init__(self, latent_dim, nb_data):
         self.latent_dim = latent_dim
         self.nb_data = nb_data
@@ -32,7 +32,6 @@ class gp_mf():
         return float(likelihood)
 
     def invert_covariance(self, gradient=False, nonlinear = False, kernel=linear_kernel):
-
         q = self.latent_dim
         Nj = len(self.rated_items)
         Xj = np.asmatrix(self.X[self.rated_items, :])
@@ -105,16 +104,19 @@ class gp_mf():
         return -self.log_likelihood()
 
     def run_mf(self, nb_iter, data):
-        pass
-
+        ratings_matrix = getDataframe_toy(out='matrix')[1].T
+        model = gp_mf(latent_dim=250, nb_data=ratings_matrix.shape[0])
+        X_init = np.zeros(model.X.shape)
+        state = np.random.get_state()
+        user = np.random.permutation()
 
 
 def test_covariance_matrix():
     user = 0
     # shape = (#items, #users)
-    ratings_matrix = getDataframe_toy(out ='matrix')[1].T
+    ratings_matrix = DataSet.get_df_toy(out="matrix")
     print(ratings_matrix)
-    model = gp_mf(latent_dim=250, nb_data=ratings_matrix.shape[0])
+    model = GpMf(latent_dim=250, nb_data=ratings_matrix.shape[0])
     # vector of observed ratings by this user
     all_y = ratings_matrix[:, user]
     model.y = all_y[~np.isnan(all_y)]
@@ -123,5 +125,4 @@ def test_covariance_matrix():
     print("ll", model.log_likelihood())
 
 test_covariance_matrix()
-
 
