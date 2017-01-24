@@ -30,9 +30,13 @@ class DataSet:
     dense_matrix = DataSet.df_to_matrix(df)
 
     To get a train / test dataframe:
-    train, test = ds.split_train_test()
+    train_df, test_df = ds.split_train_test()
 
-    To be continued...
+    Once the model trained, U and V built, one can get the prediction dataframe:
+    pred_df = DataSet.U_V_to_df(U, V, None, train_df)
+
+    Finally, to assess the accuracy of the model:
+    score = DataSet.get_score(train_df, pred_df)
     """
 
     ####################
@@ -130,6 +134,57 @@ class DataSet:
         pass
 
     @staticmethod
+    def U_V_to_df(U, V, list_index, train_df = None):
+        """
+        @Parameters:
+        ------------
+        U:          nparray   -- shape = (#users, k)
+        V:          nparray   -- shape = (#items, k)
+        traindf:    dataframe -- columns = UserId || ItemId || Rating
+        list_index: list      -- shape = [ [user_id_1, item_id_1], [user_id_2, item_id_2], ... ]
+
+        @Return:
+        --------
+        R_hat:      Dataframe -- columns = UserId || ItemId || Rating
+
+        @Infos:
+        -------
+        This function is aimed to return all ratings for a list of tuples (user_id, item_id)
+        If such a list is not provided, it is built using train_df.
+        """
+
+        R_hat = []
+
+        if not (list_index or train_df):
+            raise ValueError('Either list_index or train_df has to be provided')
+
+        if train_df:
+            list_index = []
+            for row in train_df.values:
+                list_index.append(row[0], row[1])
+
+        for index in list_index:
+            idx_user = index[0]
+            idx_item = index[1]
+            R_hat.append([ idx_user, idx_item, np.dot(U[idx_user,:], V[idx_item,:]) ])
+
+        return pd.DataFrame(R_hat)
+
+    @staticmethod
+    def get_score(train_df, prediction_df):
+        pred_map = {}
+        for row in prediction_df.values:
+            pred_map[row[0] + '-' + row[1]] = row[2]
+
+        score = 0
+        for row in train_df.values:
+            score += (row[2] - pred_map[row[0] + '-' + row[1]])**2
+
+        score /= train_df.shape[0]
+
+        return score
+
+    @staticmethod
     def df_to_matrix(df):
         """
         @Parameters:
@@ -153,6 +208,8 @@ class DataSet:
     ###################
     # Private methods #
     ###################
+
+
 
     def __set_params_online_ds(self, name, size):
         # Configure url, filename, separator and columns in csv
@@ -255,11 +312,13 @@ class DataSet:
         score_low:   Integer   -- The minimum rating
         score_high:  Integer   -- The maximum rating
         out:         String    -- 'matrix' of 'dataframe'
+
         @Return:
         --------
         df:          DataFrame -- columns = UserId || ItemId || Rating
         OR
         matrix:      nparray   -- with some nan values depending on density parameter
+
         @Infos:
         -------
         We consider that each user u has a definite (and random) type t_user(u), from (0, 1, 2, ..., u_unique - 1),
