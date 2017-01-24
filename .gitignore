@@ -95,3 +95,9 @@ ENV/
 
 *.pdf
 >>>>>>> Stashed changes
+
+src/data_fetching/Untitled.ipynb
+
+tex.txt
+
+*.swp
