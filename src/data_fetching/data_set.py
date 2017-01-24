@@ -30,7 +30,7 @@ class DataSet:
     dense_matrix = DataSet.df_to_matrix(df)
 
     To get a train / test dataframe:
-    train_df, test_df = ds.split_train_test()
+    train_df, test_df = ds.split_train_test() ---> NE FONCTIONNE PAS ENCORE
 
     Once the model trained, U and V built, one can get the prediction dataframe:
     pred_df = DataSet.U_V_to_df(U, V, None, train_df)
