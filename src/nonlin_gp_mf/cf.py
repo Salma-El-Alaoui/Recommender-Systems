@@ -2,6 +2,7 @@ import sys
 import os
 import numpy as np
 import math
+from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
 
 # Add parent directory to python path
 PACKAGE_PARENT = '..'
@@ -10,11 +11,6 @@ sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
 from data_fetching.data_fetching import USER_ID, ITEM_ID, RATING, getDataframe, fromDFtoDenseMatrix, getDataframe_toy
 
-def get_data():
-    data = getDataframe()
-    item_ids = data[ITEM_ID]
-    print(item_ids.apply(lambda x: x==242).sum())
-    user_ids = data[USER_ID]
 
 class gp_mf():
     def __init__(self, latent_dim, nb_data):
@@ -30,12 +26,13 @@ class gp_mf():
     def log_likelihood(self):
         """return the log likelihood of the model"""
         Cj_invy, logDetC = self.invert_covariance()
-        yj = np.asmatrix(self.y)
+        yj = np.asmatrix(self.y).T
         Nj = len(self.rated_items)
         likelihood = - 0.5 * (Nj * np.log(2 * math.pi) + logDetC + yj.T.dot(Cj_invy))
-        return likelihood
+        return float(likelihood)
 
-    def invert_covariance(self, gradient=False):
+    def invert_covariance(self, gradient=False, nonlinear = False, kernel=linear_kernel):
+
         q = self.latent_dim
         Nj = len(self.rated_items)
         Xj = np.asmatrix(self.X[self.rated_items, :])
@@ -45,7 +42,7 @@ class gp_mf():
         s_b = self.bias_variance
         sigNoise = s_w / s_n
 
-        if Nj > q: # we use the matrix inversion lemma
+        if Nj > q and not nonlinear: # we use the matrix inversion lemma
             XTX = Xj.T * Xj
             B = np.eye(q) + sigNoise * XTX
             Binv = np.linalg.pinv(B)
@@ -69,7 +66,7 @@ class gp_mf():
                 logdetC = logdetA + np.log(denom)
 
         else :
-            C = s_w * Xj * Xj.T
+            C = s_w * kernel(Xj, Xj)
             C = C + s_b + s_n * np.eye(Nj)
             Cinv = np.linalg.pinv(C)
             Cinvy = Cinv * yj
@@ -85,18 +82,46 @@ class gp_mf():
         else:
             return Cinvy, logdetC
 
-def test():
-    user = 3
+    def log_likelihood_grad(self, ):
+        """Computes the gradient of the log likelihood"""
+        s_w = self.lin_variance
+        s_b = self.bias_variance
+        s_n = self.white_variance
+
+        yj = np.asmatrix(self.y).T
+        Xj = np.asmatrix(self.X[self.rated_items, :])
+
+        Cinvy, CinvSum, CinvX, CinvTr = self.invert_covariance(gradient=True)
+        covGradX = 0.5 * (Cinvy * (Cinvy.T * Xj) - CinvX)
+        gX = s_w * 2.0 * covGradX
+        gsigma_w = np.multiply(covGradX, Xj).sum()
+        CinvySum = Cinvy.sum()
+        CinvSumSum = CinvSum.sum()
+        gsigma_b = 0.5 * (CinvySum * CinvySum - CinvSumSum)
+        gsigma_n = 0.5 * (Cinvy.T * Cinvy - CinvTr)
+        return gX, float(gsigma_w), float(gsigma_b), float(gsigma_n)
+
+    def objective(self):
+        return -self.log_likelihood()
+
+    def run_mf(self, nb_iter, data):
+        pass
+
+
+
+def test_covariance_matrix():
+    user = 0
     # shape = (#items, #users)
-    ratings_matrix = fromDFtoDenseMatrix(getDataframe_toy()).T
+    ratings_matrix = getDataframe_toy(out ='matrix')[1].T
+    print(ratings_matrix)
     model = gp_mf(latent_dim=250, nb_data=ratings_matrix.shape[0])
     # vector of observed ratings by this user
     all_y = ratings_matrix[:, user]
     model.y = all_y[~np.isnan(all_y)]
     # indices of items rated by this user
     model.rated_items = np.where(~np.isnan(all_y))
-    print("cov", model.invert_covariance()[0].shape)
+    print("ll", model.log_likelihood())
 
-test()
+test_covariance_matrix()
 
 
