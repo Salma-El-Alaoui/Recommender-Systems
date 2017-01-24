@@ -161,7 +161,7 @@ class DataSet:
         if train_df:
             list_index = []
             for row in train_df.values:
-                list_index.append(row[0], row[1])
+                list_index.append([row[0], row[1]])
 
         for index in list_index:
             idx_user = index[0]
