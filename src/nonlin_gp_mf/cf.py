@@ -103,18 +103,12 @@ class GpMf():
     def objective(self):
         return -self.log_likelihood()
 
-    def run_mf(self, nb_iter, data):
-        ratings_matrix = getDataframe_toy(out='matrix')[1].T
-        model = gp_mf(latent_dim=250, nb_data=ratings_matrix.shape[0])
-        X_init = np.zeros(model.X.shape)
-        state = np.random.get_state()
-        user = np.random.permutation()
-
 
 def test_covariance_matrix():
     user = 0
     # shape = (#items, #users)
-    ratings_matrix = DataSet.get_df_toy(out="matrix")
+    dataset = DataSet()
+    ratings_matrix = dataset.get_df_toy(out="matrix")
     print(ratings_matrix)
     model = GpMf(latent_dim=250, nb_data=ratings_matrix.shape[0])
     # vector of observed ratings by this user

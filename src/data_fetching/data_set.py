@@ -8,10 +8,6 @@ from urllib.request import urlopen
 from functools import lru_cache
 from pathlib import Path
 
-USER_ID = 'user_id'
-ITEM_ID = 'item_id'
-RATING = 'rating'
-TIMESTAMP = 'timestamp'
 
 
 class DataSet:
@@ -36,6 +32,10 @@ class DataSet:
 
             All users have rated at least 20 movies no matter the size of the dataset
         """
+        self.USER_ID = 'user_id'
+        self.ITEM_ID = 'item_id'
+        self.RATING = 'rating'
+        self.TIMESTAMP = 'timestamp'
 
         # Define some constants
         self.dataset = dataset
@@ -75,9 +75,9 @@ class DataSet:
             }
 
             self.columns_map = {
-                'S': [USER_ID, ITEM_ID, RATING, TIMESTAMP],
-                'M': [USER_ID, ITEM_ID, RATING, TIMESTAMP],
-                'L': [USER_ID, ITEM_ID, RATING, TIMESTAMP]
+                'S': [self.USER_ID, self.ITEM_ID, self.RATING, self.TIMESTAMP],
+                'M': [self.USER_ID, self.ITEM_ID, self.RATING, self.TIMESTAMP],
+                'L': [self.USER_ID, self.ITEM_ID, self.RATING, self.TIMESTAMP]
             }
 
         if dataset == 'jester':
@@ -94,10 +94,14 @@ class DataSet:
             }
 
             self.columns_map = {
-                'unique': [USER_ID, ITEM_ID, RATING],
+                'unique': [self.USER_ID, self.ITEM_ID, self.RATING],
             }
 
         self.df = self.get_df()
+        self.nb_users = len(np.unique(self.df[self.USER_ID]))
+        self.nb_items = len(np.unique(self.df[self.ITEM_ID]))
+        self.low_user = np.min(self.df[self.USER_ID])
+        self.high_user = np.max(self.df[self.USER_ID])
 
     @lru_cache(maxsize=256)
     def get_df(self):
@@ -115,15 +119,13 @@ class DataSet:
             url = urlopen(self.url_map[self.size])
             zipfile = ZipFile(BytesIO(url.read()))
             unzipfile = io.TextIOWrapper(zipfile.open(self.filename_map[self.size], 'r'))
-            df = pd.read_csv(unzipfile, sep=self.df.separator_map[self.size], header=None)
-
+            df = pd.read_csv(unzipfile, sep=self.separator_map[self.size], header=None)
         df.columns = self.columns_map[self.size]
-        df = df[[USER_ID, ITEM_ID, RATING]]
+        df = df[[self.USER_ID, self.ITEM_ID, self.RATING]]
 
         return df
 
-    @staticmethod
-    def get_df_toy(u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=0.3, score_low=0, score_high=5,
+    def get_df_toy(self, u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=0.3, score_low=0, score_high=5,
                    out='dataframe'):
         """
         @Parameters:
@@ -181,15 +183,29 @@ class DataSet:
 
         not_nan_index = np.argwhere(~np.isnan(ratings_nan))
         df_nan = pd.DataFrame(not_nan_index)
-        df_nan.columns = [USER_ID, ITEM_ID]
-        df_nan[RATING] = df_nan.apply(lambda row: ratings_nan[row[USER_ID]][row[ITEM_ID]], axis = 1)
-
+        df_nan.columns = [self.USER_ID, self.ITEM_ID]
+        df_nan[self.RATING] = df_nan.apply(lambda row: ratings_nan[row[self.USER_ID]][row[self.ITEM_ID]], axis=1)
 
         df = pd.DataFrame([[user, item] for user in range(u) for item in range(i)])
-        df.columns = [USER_ID, ITEM_ID]
-        df[RATING] = df.apply(lambda row: ratings[row[USER_ID]][row[ITEM_ID]], axis = 1)
+        df.columns = [self.USER_ID, self.ITEM_ID]
+        df[self.RATING] = df.apply(lambda row: ratings[row[self.USER_ID]][row[self.ITEM_ID]], axis=1)
                               
         return df, df_nan
+
+    def split_train_test(self, nb_users_weak=5000, per_users_weak=None):
+        # not complete
+        if per_users_weak:
+            nb_users_weak = int(self.nb_users * per_users_weak)
+        ind_users_remove = list(np.random.randint(low=self.low_user, high=self.high_user, size=nb_users_weak))
+        users_items_remove = dict.fromkeys(ind_users_remove)
+        for key in users_items_remove.keys():
+            items_user = list(self.df[self.df.USER_ID == key][self.ITEM_ID])
+            users_items_remove[key] = items_user[0]
+        df_train = self.df
+        df_train[self.RATING] = df_train.apply(
+            lambda row: np.nan if (row[self.USER_ID] in ind_users_remove
+                                   and row[self.ITEM_ID] == users_items_remove[row[self.USER_ID]])
+            else row[self. RATING])
 
     def df_to_matrix(self):
         """
