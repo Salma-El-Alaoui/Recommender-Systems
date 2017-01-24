@@ -5,12 +5,15 @@ import numpy as np
 from io import BytesIO
 from zipfile import ZipFile
 from urllib.request import urlopen
+from functools import lru_cache
+from pathlib import Path
 
 USER_ID = 'user_id'
 ITEM_ID = 'item_id'
 RATING = 'rating'
 TIMESTAMP = 'timestamp'
 
+@lru_cache(maxsize=256)
 def getDataframe(dataset = 'movielens', size = 'S'):
     """
     @Parameters:
@@ -94,10 +97,15 @@ def getDataframe(dataset = 'movielens', size = 'S'):
         }
                 
     # Load data in memory
-    url = urlopen(url_map[size])
-    zipfile = ZipFile(BytesIO(url.read()))
-    unzipfile  = io.TextIOWrapper(zipfile.open(filename_map[size], 'r'))
-    df = pd.read_csv(unzipfile, sep=separator_map[size], header=None)
+    csv_ondisk = Path("../../csv/" + filename_map[size])
+    if csv_ondisk.is_file():
+        df = pd.read_csv(csv_ondisk, sep=separator_map[size], header=None)
+    else:
+        url = urlopen(url_map[size])
+        zipfile = ZipFile(BytesIO(url.read()))
+        unzipfile  = io.TextIOWrapper(zipfile.open(filename_map[size], 'r'))
+        df = pd.read_csv(unzipfile, sep=separator_map[size], header=None)
+
     df.columns = columns_map[size]
     df = df[[USER_ID, ITEM_ID, RATING]]
     
@@ -116,13 +124,11 @@ def getDataframe_toy(u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=
     score_low:   Integer   -- The minimum rating
     score_high:  Integer   -- The maximum rating
     out:         String    -- 'matrix' of 'dataframe'
-
     @Return:
     --------
     df:          DataFrame -- columns = UserId || ItemId || Rating
     OR 
     matrix:      nparray   -- with some nan values depending on density parameter
-
     @Infos:
     -------
     We consider that each user u has a definite (and random) type t_user(u), from (0, 1, 2, ..., u_unique - 1), 
@@ -180,7 +186,7 @@ def fromDFtoDenseMatrix(df):
     
     @Return:
     --------
-    res:   Dense Dataframe, 
+    res:   Dense nparray, 
            shape = (# user_id, # item_id), 
            element[i][j] = rating for user_id[i], item_id[j]  if rating exists
                            nan.                               otherwise
@@ -190,8 +196,9 @@ def fromDFtoDenseMatrix(df):
     res = np.nan*np.zeros((user_id_max + 1, item_id_max + 1))
     for row in df.values:
         res[row[0]][row[1]] = row[2]
-    return pd.DataFrame(res)
+    return res
 
+@lru_cache(maxsize=256)
 def getDataframes_CV():
     """
     @Parameters:
