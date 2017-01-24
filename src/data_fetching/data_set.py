@@ -174,11 +174,11 @@ class DataSet:
     def get_score(train_df, prediction_df):
         pred_map = {}
         for row in prediction_df.values:
-            pred_map[row[0] + '-' + row[1]] = row[2]
+            pred_map[str(row[0]) + '-' + str(row[1])] = row[2]
 
         score = 0
         for row in train_df.values:
-            score += (row[2] - pred_map[row[0] + '-' + row[1]])**2
+            score += (row[2] - pred_map[str(row[0]) + '-' + str(row[1])])**2
 
         score /= train_df.shape[0]
 
