@@ -30,7 +30,7 @@ class DataSet:
     dense_matrix = DataSet.df_to_matrix(df)
 
     To get a train / test dataframe:
-    train_df, test_df = ds.split_train_test() ---> NE FONCTIONNE PAS ENCORE
+    train_df, test_df = ds.split_train_test(False)
 
     Once the model trained, U and V built, one can get the prediction dataframe:
     pred_df = DataSet.U_V_to_df(U, V, None, train_df)
@@ -55,18 +55,18 @@ class DataSet:
     DATASETS_TO_BE_FETCHED = ['movielens', 'jester']
     SIZE = ['S', 'M', 'L']
 
+    
     ###############
     # Constructor #
     ###############
 
-    def __init__(self, dataset='movielens', size='S', out='dataframe',
+    def __init__(self, dataset='movielens', size='S',
                      u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=0.3, score_low=0, score_high=5):
         """
         @Parameters:
         ------------
         dataset: String -- 'movielens' or 'jester' or 'toy'
         size:    String -- 'S', 'M' or 'L'(only for 'movielens')
-        out:     String -- 'dataframe' or 'matrix'
         u, i, u_unique, i_unique, density, noise, score_low, score_high -- See get_df_toy (only for toy dataset)
 
         @Infos:
@@ -93,17 +93,17 @@ class DataSet:
 
         # Configure parameters
         if dataset in DataSet.DATASETS_TO_BE_FETCHED:
-            self.__set_params_online_ds(dataset)
+            self.__set_params_online_ds(dataset, size)
         else:
             self.__set_params_toy_ds(u, i, u_unique, i_unique, density, noise, score_low, score_high)
 
-        self.df, self.df_complete = self.__set_df(out)
+        self.df, self.df_complete = self.__set_df()
         self.nb_users  = len(np.unique(self.df[self.USER_ID]))
         self.nb_items  = len(np.unique(self.df[self.ITEM_ID]))
         self.low_user  = np.min(self.df[self.USER_ID])
         self.high_user = np.max(self.df[self.USER_ID])
 
-
+        
     ##################
     # Public methods #
     ##################
@@ -115,20 +115,44 @@ class DataSet:
         # Only for toy dataset
         return self.df_complete
 
-    def split_train_test(self, nb_users_weak=5000, per_users_weak=None):
-        # To be complete
-        if per_users_weak:
-            nb_users_weak = int(self.nb_users * per_users_weak)
-        ind_users_remove = list(np.random.randint(low=self.low_user, high=self.high_user, size=nb_users_weak))
-        users_items_remove = dict.fromkeys(ind_users_remove)
-        for key in users_items_remove.keys():
-            items_user = list(self.df[self.df[DataSet.USER_ID] == key][DataSet.USER_ID])
-            users_items_remove[key] = items_user[0]
-        df_train = self.df
-        df_train[self.RATING] = df_train.apply(
-            lambda row: np.nan if (row[DataSet.USER_ID] in ind_users_remove
-                                   and row[DataSet.ITEM_ID] == users_items_remove[row[DataSet.USER_ID]])
-            else row[self.RATING])
+    def split_train_test(self, strong_generalization = True, train_size = 0.8):
+        """
+        @Parameters:
+        ------------
+        strong_generalization: Boolean          -- If false, weak generalization approach
+        train_size:            Float in [0, 1]  -- Only for strong_generalization
+
+        @Return:
+        --------
+        train_set_df, test_set_observed_df, test_set_heldout_df -- if strong generalization approach
+        train_set_df, test_set_df                               -- if weak generalization approach
+
+        @Infos:
+        -------
+        In a nutshell:
+        Weak generalization --> For each user, one rating is hold out (test set), the other ratings = training set
+        Strong generalization --> User set is divided in training set / test set. The model is trained using all 
+                                  data available in training set. Test set is then divided in observed values/held out
+                                  values. Prediction have to be made on the test set on held out values, based on 
+                                  observed values using the model trained on the training set.
+        For more informations : https://people.cs.umass.edu/~marlin/research/thesis/cfmlp.pdf - Section 3.3
+        """
+        unique_user_id = np.unique(self.df[DataSet.USER_ID])
+        if strong_generalization:
+            user_id_train_set = np.random.choice(unique_user_id, size=int(train_size*len(unique_user_id)), replace=False)
+            user_id_test_set  = np.setdiff1d(unique_user_id, user_id_train_set)
+            train_set_df = self.df[self.df[DataSet.USER_ID].isin(user_id_train_set)]
+            test_set_df = self.df[~self.df[DataSet.USER_ID].isin(user_id_train_set)]
+            idx_heldout_test_set = [np.random.choice(test_set_df[test_set_df[DataSet.USER_ID] == idx].index) for idx in user_id_test_set]
+            test_set_heldout_df  = test_set_df.loc[idx_heldout_test_set]
+            test_set_observed_df = test_set_df.loc[np.setdiff1d(test_set_df.index, idx_heldout_test_set)]
+            return train_set_df, test_set_observed_df, test_set_heldout_df
+        else:
+            # Weak generalization
+            idx_heldout_test_set = [np.random.choice(self.df[self.df[DataSet.USER_ID] == idx].index) for idx in unique_user_id]
+            test_set_df  = self.df.loc[idx_heldout_test_set]
+            train_set_df = self.df.loc[np.setdiff1d(self.df.index, idx_heldout_test_set)]
+            return train_set_df, test_set_df
 
     def get_description(self):
         pass
@@ -205,17 +229,16 @@ class DataSet:
             res[row[0]][row[1]] = row[2]
         return res
 
+    
     ###################
     # Private methods #
     ###################
-
-
 
     def __set_params_online_ds(self, name, size):
         # Configure url, filename, separator and columns in csv
 
         # Change size if necessary
-        self.__size = size if dataset in DataSet.DATASETS_WITH_SIZE else 'unique'
+        self.__size = size if self.dataset in DataSet.DATASETS_WITH_SIZE else 'unique'
 
         if self.dataset == 'movielens':
             self.__url_map = {
@@ -259,7 +282,7 @@ class DataSet:
                 'unique': [DataSet.USER_ID, DataSet.ITEM_ID, DataSet.RATING],
             }
 
-    def __set_params_toy_ds(u, i, u_unique, i_unique, density, noise, score_low, score_high):
+    def __set_params_toy_ds(self, u, i, u_unique, i_unique, density, noise, score_low, score_high):
         self.__u = u
         self.__i = i
         self.__u_unique = u_unique
@@ -270,7 +293,7 @@ class DataSet:
         self.score_high = score_high
 
     @lru_cache(maxsize=256)
-    def __set_df(self, out):
+    def __set_df(self):
         """
         @Return:
         --------
@@ -289,12 +312,10 @@ class DataSet:
                 df = pd.read_csv(unzipfile, sep=self.__separator_map[self.__size], header=None)
             df.columns = self.__columns_map[self.__size]
             df = df[[DataSet.USER_ID, DataSet.ITEM_ID, DataSet.RATING]]
-            if out == 'matrix':
-                df = self.df_to_matrix(df)
             df_complete = None
         else:
-            df, df_complete = self.__get_df_toy(self.__u, self.__i, self.__u_unique, self.__i_unique,
-                                       self.density, self.__noise, self.score_low, self.score_high, out)
+            df_complete, df = self.__get_df_toy(self.__u, self.__i, self.__u_unique, self.__i_unique,
+                                       self.density, self.__noise, self.score_low, self.score_high, out="dataframe")
 
 
         return df, df_complete
