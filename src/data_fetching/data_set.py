@@ -36,10 +36,10 @@ class DataSet:
     train_df, test_df = ds.split_train_test(False)
 
     Once the model trained, U and V built, one can get the prediction dataframe:
-    pred_df = DataSet.U_V_to_df(U, V, None, train_df)
+    pred_df = DataSet.U_V_to_df(U, V, None, test_df)
 
     Finally, to assess the accuracy of the model:
-    score = DataSet.get_score(train_df, pred_df)
+    score = DataSet.get_score(test_df, pred_df)
     """
 
     ####################
@@ -169,13 +169,13 @@ class DataSet:
         }
 
     @staticmethod
-    def U_V_to_df(U, V, list_index, train_df = None):
+    def U_V_to_df(U, V, list_index, test_df = None):
         """
         @Parameters:
         ------------
         U:          nparray   -- shape = (#users, k)
         V:          nparray   -- shape = (#items, k)
-        traindf:    dataframe -- columns = UserId || ItemId || Rating
+        test_df:    dataframe -- columns = UserId || ItemId || Rating
         list_index: list      -- shape = [ [user_id_1, item_id_1], [user_id_2, item_id_2], ... ]
 
         @Return:
@@ -185,17 +185,17 @@ class DataSet:
         @Infos:
         -------
         This function is aimed to return all ratings for a list of tuples (user_id, item_id)
-        If such a list is not provided, it is built using train_df.
+        If such a list is not provided, it is built using test_df.
         """
 
         R_hat = []
 
-        if not (list_index or train_df):
-            raise ValueError('Either list_index or train_df has to be provided')
+        if not (list_index or test_df):
+            raise ValueError('Either list_index or test_df has to be provided')
 
-        if train_df:
+        if test_df:
             list_index = []
-            for row in train_df.values:
+            for row in test_df.values:
                 list_index.append([row[0], row[1]])
 
         for index in list_index:
@@ -206,16 +206,16 @@ class DataSet:
         return pd.DataFrame(R_hat)
 
     @staticmethod
-    def get_score(train_df, prediction_df):
+    def get_score(test_df, prediction_df):
         pred_map = {}
         for row in prediction_df.values:
             pred_map[str(row[0]) + '-' + str(row[1])] = row[2]
 
         score = 0
-        for row in train_df.values:
+        for row in test_df.values:
             score += (row[2] - pred_map[str(row[0]) + '-' + str(row[1])])**2
 
-        score /= train_df.shape[0]
+        score /= test_df.shape[0]
 
         return score
 
