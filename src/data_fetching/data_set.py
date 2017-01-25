@@ -133,10 +133,10 @@ class DataSet:
         @Infos:
         -------
         In a nutshell:
-        Weak generalization --> For each user, one rating is hold out (test set), the other ratings = training set
+        Weak generalization --> For each user, one rating is held out (test set), the other ratings = training set
         Strong generalization --> User set is divided in training set / test set. The model is trained using all 
                                   data available in training set. Test set is then divided in observed values/held out
-                                  values. Prediction have to be made on the test set on held out values, based on 
+                                  values. Predictions have to be made on the test set on held out values, based on 
                                   observed values using the model trained on the training set.
         For more informations : https://people.cs.umass.edu/~marlin/research/thesis/cfmlp.pdf - Section 3.3
         """
