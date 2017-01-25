@@ -20,7 +20,7 @@ class DataSet:
     Initialize the class with a dataset ('movielens', 'jester' or 'toy'), e.g:
     ds = DataSet(dataset='movielens')
 
-    Once loaded, get your dataframe, columns = [ user_id, item_id, rating ]:
+    Once loaded, to the dataframe, with columns = [ user_id, item_id, rating ]:
     df = ds.get_df()
 
     If the toy dataset was chosen, one can access the full dataset:
@@ -28,6 +28,9 @@ class DataSet:
 
     Instead of the dataframe, one can get the dense rating matrix:
     dense_matrix = DataSet.df_to_matrix(df)
+    
+    To get some infos on the df, run:
+    ds.get_description()
 
     To get a train / test dataframe:
     train_df, test_df = ds.split_train_test(False)
@@ -155,7 +158,15 @@ class DataSet:
             return train_set_df, test_set_df
 
     def get_description(self):
-        pass
+        return {
+            "Number of users": self.nb_users,
+            "Number of items": self.nb_items,
+            "Lowest user": self.low_user,
+            "Highest user": self.high_user,
+            "Density": self.df.shape[0] / (self.nb_items * self.nb_users),
+            "Mean of ratings": np.mean(self.df[DataSet.RATING]),
+            "Standard deviation of ratings": np.std(self.df[DataSet.RATING])
+        }
 
     @staticmethod
     def U_V_to_df(U, V, list_index, train_df = None):
