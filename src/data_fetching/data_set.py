@@ -20,7 +20,7 @@ class DataSet:
     Initialize the class with a dataset ('movielens', 'jester' or 'toy'), e.g:
     ds = DataSet(dataset='movielens')
 
-    Once loaded, to the dataframe, with columns = [ user_id, item_id, rating ]:
+    Once loaded, to get the dataframe with columns = [ user_id, item_id, rating ]:
     df = ds.get_df()
 
     If the toy dataset was chosen, one can access the full dataset:
