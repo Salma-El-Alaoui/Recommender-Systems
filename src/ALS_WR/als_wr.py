@@ -17,7 +17,7 @@ PACKAGE_PARENT = '..'
 SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
-from data_fetching.data_fetching import getDataframe
+from data_fetching.data_set import DataSet
 
 def ALS_WR(df_train):
     print("Beginning...")
@@ -36,7 +36,6 @@ def ALS_WR(df_train):
     
     # Input
     #   Y: feature matrix of movies
-    #   u: a user_id
     #   Du: pd.DataFrame corresponding to u
     # Output
     #   the feature vector x_u for user u
@@ -53,15 +52,14 @@ def ALS_WR(df_train):
         
     # Input
     #   X: feature matrix of movies
-    #   i: a user_id
-    #   Du: pd.DataFrame corresponding to u
+    #   Di: pd.DataFrame corresponding to i
     # Output
-    #   the feature vector x_u for user u
+    #   the feature vector y_i for item i
     def findYi(X,Di):
-        nu = Di.shape[0]
-        Ai = nu * lmda * np.eye(r)
+        ni = Di.shape[0]
+        Ai = ni * lmda * np.eye(r)
         Vi = np.zeros(r)
-        for index, row in Du.iterrows():
+        for index, row in Di.iterrows():
             xu = X[row.user_id-1]
             rui = row.rating
             Ai += xu[:,None] * xu[None,:]
@@ -70,11 +68,11 @@ def ALS_WR(df_train):
     
     print("Begin groupby")
     grouped_by_userid = df_train.groupby(['user_id'])
-    print("2e groupby")
+    print("2th groupby")
     grouped_by_itemid = df_train.groupby(['item_id'])
-    print("Begin iteration.")
+    print("Begin iteration")
     
-    for _ in range(10):
+    for _ in range(30):
         t1 = time.time()
         for user in range(n_users):
             uid = user + 1
@@ -88,7 +86,6 @@ def ALS_WR(df_train):
         print(str(_)+"-th iteration, time: "+str(t2-t1))
     return X, Y
     
-#df = getDataframe()
 
 
 

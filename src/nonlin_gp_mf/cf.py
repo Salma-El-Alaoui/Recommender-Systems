@@ -177,4 +177,5 @@ def perf_weak(dataset=DataSet(), base_dim=11):
     rmse = np.linalg.norm(np.asarray(predictions) - np.asarray(true_ratings)) / np.sqrt(n)
     print(rmse)
 
+
 perf_weak()

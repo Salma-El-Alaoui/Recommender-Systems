@@ -63,8 +63,7 @@ class DataSet:
     # Constructor #
     ###############
 
-    def __init__(self, dataset='movielens', size='S',
-                     u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=0.3, score_low=1, score_high=5, strong_gen=False, train_size=0.8):
+    def __init__(self, dataset='movielens', size='S', u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=0.3, score_low=1, score_high=5, strong_gen=False, train_size=0.8):
         """
         @Parameters:
         ------------
