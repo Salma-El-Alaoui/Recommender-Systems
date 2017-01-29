@@ -163,18 +163,27 @@ def predict(user, test_items, model, dataset):
 
 
 def perf_weak(dataset=DataSet(), base_dim=11):
-    model_init = GpMf(latent_dim=base_dim * dataset.nb_users_train, nb_data=dataset.nb_items)
+    print(dataset.get_description())
+    model_init = GpMf(latent_dim=base_dim, nb_data=dataset.nb_items)
     model = fit(dataset=dataset, model=model_init)
     predictions = []
     true_ratings = []
-    for user in dataset.get_users_test():
+    test_users = dataset.get_users_test()
+    nb_users_test = len(test_users)
+    print("nb_users", nb_users_test)
+    count = 0
+    for user in test_users:
         prediction = predict(user, dataset.get_item_test(user) - 1, model, dataset)
-        print("prediction", prediction)
+        if prediction > dataset.high_rating:
+            prediction = dataset.high_rating
+        if prediction < dataset.low_rating:
+            prediction = dataset.low_rating
         predictions.append(prediction)
-        print("true_rating", dataset.get_rating_test(user))
-        true_ratings.append(true_ratings)
-    n = len(predictions)
-    rmse = np.linalg.norm(np.asarray(predictions) - np.asarray(true_ratings)) / np.sqrt(n)
+        rating = dataset.get_rating_test(user)
+        true_ratings.append(rating)
+        count += 1
+        print(count, "over ", nb_users_test, "users")
+    rmse = np.linalg.norm(np.asarray(predictions) - np.asarray(true_ratings)) / np.sqrt(nb_users_test)
     print(rmse)
 
 

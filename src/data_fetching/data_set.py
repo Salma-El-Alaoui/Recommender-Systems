@@ -104,6 +104,8 @@ class DataSet:
         self.nb_items = len(np.unique(self.df[DataSet.ITEM_ID]))
         self.low_user = np.min(self.df[DataSet.USER_ID])
         self.high_user = np.max(self.df[DataSet.USER_ID])
+        self.low_rating = np.min(self.df[DataSet.RATING])
+        self.high_rating = np.max(self.df[DataSet.RATING])
 
         #Train and test set
         self.df_train, self.df_test, self.df_heldout = self.split_train_test(strong_generalization=strong_gen, train_size=train_size)
