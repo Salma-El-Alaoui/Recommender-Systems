@@ -3,6 +3,7 @@ import os
 import numpy as np
 import math
 from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
+import time
 
 # Add parent directory to python path
 PACKAGE_PARENT = '..'
@@ -16,7 +17,7 @@ class GpMf():
     def __init__(self, latent_dim, nb_data):
         self.latent_dim = latent_dim
         self.nb_data = nb_data
-        self.X = np.random.normal(0, 1e-6, (nb_data, latent_dim))
+        self.X = np.random.normal(0, 1e-3, (nb_data, latent_dim))
         self.lin_variance = 1.0
         self.bias_variance = 0.11
         self.white_variance = 5.0
@@ -104,19 +105,76 @@ class GpMf():
         return -self.log_likelihood()
 
 
-def test_covariance_matrix():
-    user = 0
-    # shape = (#items, #users)
-    dataset = DataSet()
-    ratings_matrix = dataset.get_df_toy(out="matrix")
-    print(ratings_matrix)
-    model = GpMf(latent_dim=250, nb_data=ratings_matrix.shape[0])
-    # vector of observed ratings by this user
-    all_y = ratings_matrix[:, user]
-    model.y = all_y[~np.isnan(all_y)]
-    # indices of items rated by this user
-    model.rated_items = np.where(~np.isnan(all_y))
-    print("ll", model.log_likelihood())
+def fit(dataset, model, nb_iter=10, seed=42, momentum=0.9):
+    data = dataset.get_df()
+    param_init = np.zeros((1, 3))
+    X_init = np.zeros(model.X.shape)
+    for iter in range(nb_iter):
+        print("iteration", iter)
+        tic = time.time()
+        np.random.seed(seed=seed)
+        state = np.random.get_state()
+        users = np.random.permutation(dataset.get_users())
+        for user in users:
+            #print("begin user", user,  "=========================")
+            toc = time.time()
+            lr = 1e-4
+            y = dataset.get_ratings_user(user)
+            rated_items = dataset.get_items_user(user) - 1
+            model.y = y
+            model.rated_items = rated_items
+            grad_X, grad_w, grad_b, grad_n = model.log_likelihood_grad()
+            gradient_param = np.array([grad_w * model.lin_variance,
+                               grad_b * model.bias_variance,
+                               grad_n * model.white_variance])
+            param = np.log(np.array([model.lin_variance,
+                                     model.bias_variance,
+                                     model.white_variance]))
+            # update X
+            X = X_init[rated_items, :]
+            ar = lr * 10
+            X = X * momentum + grad_X * ar
+            X_init[rated_items, :] = X
+            model.X[rated_items, :] = model.X[rated_items, :] + X
 
-test_covariance_matrix()
+            # update variances
+            param_init = param_init * momentum + gradient_param * lr
+            param = param + param_init
+            model.lin_variance = math.exp(param[0, 0])
+            model.bias_variance = math.exp(param[0, 1])
+            model.white_variance = math.exp(param[0, 2])
+            #print("end user", user, "=========================")
 
+        print("end iteration", iter,  "=========================")
+        print("duration iteration", time.time() - tic)
+    return model
+
+
+def predict(user, test_items, model, dataset):
+    y = dataset.get_ratings_user(user)
+    rated_items = dataset.get_items_user(user) - 1
+    model.rated_items = rated_items
+    model.y = y
+    X_test = np.asmatrix(model.X[test_items, :])
+    X = np.asmatrix(model.X[model.rated_items, :])
+    Cinvy, CinvSum, CinvX, CinvTr = model.invert_covariance(gradient=True)
+    mean = model.lin_variance* X_test*(X.T*Cinvy) + Cinvy.sum() * model.bias_variance
+    return mean
+
+
+def perf_weak(dataset=DataSet(), base_dim=11):
+    model_init = GpMf(latent_dim=base_dim * dataset.nb_users_train, nb_data=dataset.nb_items)
+    model = fit(dataset=dataset, model=model_init)
+    predictions = []
+    true_ratings = []
+    for user in dataset.get_users_test():
+        prediction = predict(user, dataset.get_item_test(user) - 1, model, dataset)
+        print("prediction", prediction)
+        predictions.append(prediction)
+        print("true_rating", dataset.get_rating_test(user))
+        true_ratings.append(true_ratings)
+    n = len(predictions)
+    rmse = np.linalg.norm(np.asarray(predictions) - np.asarray(true_ratings)) / np.sqrt(n)
+    print(rmse)
+
+perf_weak()

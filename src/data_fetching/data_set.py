@@ -64,7 +64,7 @@ class DataSet:
     ###############
 
     def __init__(self, dataset='movielens', size='S',
-                     u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=0.3, score_low=0, score_high=5):
+                     u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=0.3, score_low=1, score_high=5, strong_gen=False, train_size=0.8):
         """
         @Parameters:
         ------------
@@ -101,18 +101,57 @@ class DataSet:
             self.__set_params_toy_ds(u, i, u_unique, i_unique, density, noise, score_low, score_high)
 
         self.df, self.df_complete = self.__set_df()
-        self.nb_users  = len(np.unique(self.df[self.USER_ID]))
-        self.nb_items  = len(np.unique(self.df[self.ITEM_ID]))
-        self.low_user  = np.min(self.df[self.USER_ID])
-        self.high_user = np.max(self.df[self.USER_ID])
+        self.nb_users = len(np.unique(self.df[DataSet.USER_ID]))
+        self.nb_items = len(np.unique(self.df[DataSet.ITEM_ID]))
+        self.low_user = np.min(self.df[DataSet.USER_ID])
+        self.high_user = np.max(self.df[DataSet.USER_ID])
 
+        #Train and test set
+        self.df_train, self.df_test, self.df_heldout = self.split_train_test(strong_generalization=strong_gen, train_size=train_size)
+        self.nb_users_train = len(np.unique(self.df_train[DataSet.USER_ID]))
+        self.nb_items_train = len(np.unique(self.df_train[DataSet.ITEM_ID]))
         
     ##################
     # Public methods #
     ##################
 
+    def get_items_user(self, user):
+        """
+        returns indices of items rated by this user
+        """
+        users = self.df_train.groupby([DataSet.USER_ID])
+        return users.get_group(user)[DataSet.ITEM_ID].values
+
+    def get_ratings_user(self, user):
+        """
+        returns observed ratings by this user
+        """
+        users = self.df_train.groupby([DataSet.USER_ID])
+        return users.get_group(user)[DataSet.RATING].values
+
+    def get_users(self):
+        return np.unique(self.df_train[DataSet.USER_ID])
+
+    def get_users_test(self):
+        return np.unique(self.df_test[DataSet.USER_ID])
+
+    def get_item_test(self, user):
+        return int(self.df_test.loc[self.df_test[DataSet.USER_ID] == user, DataSet.ITEM_ID])
+
+    def get_rating_test(self, user):
+        return float(self.df_test.loc[self.df_test[DataSet.USER_ID] == user, DataSet.RATING])
+
     def get_df(self):
         return self.df
+
+    def get_df_train(self):
+        return self.df_train
+
+    def get_df_test(self):
+        return self.df_test
+
+    def get_df_heldout(self):
+        return self.df_heldout
 
     def get_df_complete(self):
         # Only for toy dataset
@@ -138,7 +177,7 @@ class DataSet:
                                   data available in training set. Test set is then divided in observed values/held out
                                   values. Predictions have to be made on the test set on held out values, based on 
                                   observed values using the model trained on the training set.
-        For more informations : https://people.cs.umass.edu/~marlin/research/thesis/cfmlp.pdf - Section 3.3
+        For more information : https://people.cs.umass.edu/~marlin/research/thesis/cfmlp.pdf - Section 3.3
         """
         unique_user_id = np.unique(self.df[DataSet.USER_ID])
         if strong_generalization:
@@ -153,9 +192,9 @@ class DataSet:
         else:
             # Weak generalization
             idx_heldout_test_set = [np.random.choice(self.df[self.df[DataSet.USER_ID] == idx].index) for idx in unique_user_id]
-            test_set_df  = self.df.loc[idx_heldout_test_set]
+            test_set_df = self.df.loc[idx_heldout_test_set]
             train_set_df = self.df.loc[np.setdiff1d(self.df.index, idx_heldout_test_set)]
-            return train_set_df, test_set_df
+            return train_set_df, test_set_df, 0
 
     def get_description(self):
         return {
