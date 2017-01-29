@@ -54,7 +54,7 @@ def ALS_WR(df_train):
     #   X: feature matrix of movies
     #   Di: pd.DataFrame corresponding to i
     # Output
-    #   the feature vector y_i for user i
+    #   the feature vector y_i for item i
     def findYi(X,Di):
         ni = Di.shape[0]
         Ai = ni * lmda * np.eye(r)
@@ -72,7 +72,7 @@ def ALS_WR(df_train):
     grouped_by_itemid = df_train.groupby(['item_id'])
     print("Begin iteration")
     
-    for _ in range(10):
+    for _ in range(30):
         t1 = time.time()
         for user in range(n_users):
             uid = user + 1
