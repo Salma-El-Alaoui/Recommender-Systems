@@ -10,7 +10,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy import linalg as LA
 from numpy import *
-from getData import DataSet
 import os
 import sys
 import time
@@ -20,6 +19,7 @@ PACKAGE_PARENT = '..'
 SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
+from data_fetching.data_set import DataSet
 
 class PMF(object):
     def __init__(self, num_latent_feat=15, learning_rate=1, _lambda=0.1, momentum=0.9, maxepoch=100, num_batches=10,
@@ -158,12 +158,12 @@ class PMF(object):
 
 if __name__ == "__main__":
     pmf = PMF()
-    ds = DataSet(dataset='movielens',size ='S')
+    ds = DataSet(dataset='movielens', size ='S')
     #ds = DataSet(dataset='jester')
     ds_v= ds.get_df()
     ratings = ds_v.values
     print(len(np.unique(ratings[:, 0])), len(np.unique(ratings[:, 1])), pmf.num_latent_feat)
-    train_init, test_init = ds.split_train_test(strong_generalization = False, train_size = 0.8)
+    train_init, test_init, _ = ds.split_train_test(strong_generalization = False, train_size = 0.8)
     train = train_init.values
     test = test_init.values
     pmf.fit(train, test)
