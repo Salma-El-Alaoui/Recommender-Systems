@@ -63,7 +63,7 @@ class DataSet:
     # Constructor #
     ###############
 
-    def __init__(self, dataset='movielens', size='S', u=100, i=1000, u_unique=10, i_unique=5, density=0.1, noise=0.3, score_low=1, score_high=5, strong_gen=False, train_size=0.8):
+    def __init__(self, dataset='movielens', size='S', u=100, i=1000, u_unique=10, i_unique=5, density=0.2, noise=0.3, score_low=1, score_high=5, strong_gen=False, train_size=0.8):
         """
         @Parameters:
         ------------
@@ -197,6 +197,26 @@ class DataSet:
             train_set_df = self.df.loc[np.setdiff1d(self.df.index, idx_heldout_test_set)]
             return train_set_df, test_set_df, 0
 
+    def get_CV_set(self, fold = 5):
+        df = self.get_df_train()
+        unique_user_id = np.unique(df[DataSet.USER_ID])
+
+        def split_CV(arr, fold):
+            idx = [int(np.round(i*len(arr)/fold)) for i in range(fold)]
+            return [arr[idx[k]:idx[k+1] if k < fold - 1 else None] for k in range(fold)]
+
+        idx_CV = [split_CV(np.random.permutation(df[df[DataSet.USER_ID] == idx].index), fold) for idx in unique_user_id]
+        idx_CV = [np.concatenate([[idx_CV[i][j]] for i in range(len(unique_user_id))], axis=1) for j in range(fold)]
+        idx_CV = [idx_CV[i][0] for i in range(fold)]
+
+        out = []
+        for idx_test in idx_CV:
+            test_set_df = df.loc[idx_test]
+            train_set_df = df.loc[np.setdiff1d(df.index, idx_test)]
+            out.append((train_set_df, test_set_df))
+        
+        return out    
+    
     def get_description(self):
         return {
             "Number of users": self.nb_users,
@@ -423,7 +443,7 @@ class DataSet:
                          2)
 
         # We apply the density parameter
-        ratings_nan = np.where(np.random.binomial(2, density, size=(u, i)) == 0, np.nan, 1)*ratings
+        ratings_nan = np.where(np.random.binomial(1, density, size=(u, i)) == 0, np.nan, 1)*ratings
 
         if out == 'matrix':
             return ratings, ratings_nan
