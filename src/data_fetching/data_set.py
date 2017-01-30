@@ -158,12 +158,14 @@ class DataSet:
         # Only for toy dataset
         return self.df_complete
 
-    def split_train_test(self, strong_generalization = True, train_size = 0.8):
+    def split_train_test(self, strong_generalization = True, train_size = 0.8, users_size = 1.):
         """
         @Parameters:
         ------------
-        strong_generalization: Boolean          -- If false, weak generalization approach
-        train_size:            Float in [0, 1]  -- Only for strong_generalization
+        strong_generalization: Boolean                -- If false, weak generalization approach
+        train_size:            Float in [0, 1]        -- Only for strong_generalization
+        user_size:             Float in [0, 1] or int -- If float, only users_size% of users are considered. 
+                                                         If int, only users_size users are considered.
 
         @Return:
         --------
@@ -180,7 +182,13 @@ class DataSet:
                                   observed values using the model trained on the training set.
         For more information : https://people.cs.umass.edu/~marlin/research/thesis/cfmlp.pdf - Section 3.3
         """
-        unique_user_id = np.unique(self.df[DataSet.USER_ID])
+        unique_user_id = np.random.permutation(np.unique(self.df[DataSet.USER_ID]))
+        if type(users_size) == float and users_size <= 1. and users_size >= 0.:
+            unique_user_id = unique_user_id[:int(users_size*len(users_size))]
+        elif type(users_size) == int and users_size >= 1 and users_size <= len(users_size):
+            unique_user_id = unique_user_id[:users_size]
+        else:
+            raise ValueError('The users_size value is not allowed')
         if strong_generalization:
             user_id_train_set = np.random.choice(unique_user_id, size=int(train_size*len(unique_user_id)), replace=False)
             user_id_test_set  = np.setdiff1d(unique_user_id, user_id_train_set)
