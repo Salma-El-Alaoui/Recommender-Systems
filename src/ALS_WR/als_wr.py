@@ -19,32 +19,69 @@ sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
 from data_fetching.data_set import DataSet
 
-def ALS_WR(df_train):
-    print("Beginning...")
+class ALS_WR():
     
-    # Hyperparameters
-    # r : number of latent features
-    # lmda : penalization coefficient
-    r = 10
-    lmda = 0.065
-    
-    n_users = df_train.user_id.unique().size
-    n_items = df_train.item_id.unique().size
-    
-    X = np.random.rand(n_users,r)
-    Y = np.random.rand(n_items,r)
-    
+    def __init__(self,train_df,test_df,r=10,lmda=0.065):
+        # Hyperparameters
+        # r : number of latent features
+        # lmda : penalization coefficient
+        self.r = r
+        self.lmda = lmda
+        
+        self.train_df = train_df
+        self.test_df = test_df.copy()
+        self.test_df["rating_pred"] = 0
+        self.n_users = max(train_df.user_id.max(),test_df.user_id.max())
+        self.n_items = max(train_df.item_id.max(),test_df.item_id.max())
+        self.user_id_unique = train_df.user_id.unique()
+        self.item_id_unique = train_df.item_id.unique()
+        self.grouped_by_userid = self.train_df.groupby(['user_id'])
+        self.grouped_by_itemid = self.train_df.groupby(['item_id'])
+        self.X = np.random.rand(self.n_users,r)
+        self.Y = np.random.rand(self.n_items,r)
+        print("n_users: %d" % self.n_users)
+        print("n_items: %d" % self.n_items)
+        
+        # variables memorizing the information after each iteration
+        self.n_iter_carried_out = 0
+        self.RMSE_test_after_each_iter = []
+        self.time_for_each_iter = []
+
+
+    def fit(self,n_iter=10):
+        print("ALS-WR begins...\n")
+        for i in range(n_iter):
+            t1 = time.time()
+            for uid in self.user_id_unique:
+                Du = self.grouped_by_userid.get_group(uid)
+                self.X[uid-1] = self.__find_Xu(self.Y,Du)
+            for iid in self.item_id_unique:
+                Di = self.grouped_by_itemid.get_group(iid)
+                self.Y[iid-1] = self.__find_Yi(self.X,Di)
+            t2 = time.time()
+            delta_t = t2 - t1
+            self.time_for_each_iter.append(delta_t)
+            self.n_iter_carried_out += 1
+            print("%d-th iteration finished." % self.n_iter_carried_out)
+            print("Time used: %.2f" % delta_t)
+            self.pred()
+            rmse = self.get_RMSE()
+            self.RMSE_test_after_each_iter.append(rmse)
+            print("Current RMSE: %.4f \n" % rmse)
+            
+        
     # Input
     #   Y: feature matrix of movies
     #   Du: pd.DataFrame corresponding to u
     # Output
     #   the feature vector x_u for user u
-    def findXu(Y,Du):
+    def __find_Xu(self,Y,Du):
         nu = Du.shape[0]
-        Au = nu * lmda * np.eye(r)
-        Vu = np.zeros(r)
+        Au = nu * self.lmda * np.eye(self.r)
+        Vu = np.zeros(self.r)
         for index, row in Du.iterrows():
-            yi = Y[row.item_id-1]
+            iid = row.item_id
+            yi = Y[iid-1]
             rui = row.rating
             Au += yi[:,None] * yi[None,:]
             Vu += rui * yi
@@ -55,42 +92,24 @@ def ALS_WR(df_train):
     #   Di: pd.DataFrame corresponding to i
     # Output
     #   the feature vector y_i for item i
-    def findYi(X,Di):
+    def __find_Yi(self,X,Di):
         ni = Di.shape[0]
-        Ai = ni * lmda * np.eye(r)
-        Vi = np.zeros(r)
+        Ai = ni * self.lmda * np.eye(self.r)
+        Vi = np.zeros(self.r)
         for index, row in Di.iterrows():
-            xu = X[row.user_id-1]
+            uid = row.user_id
+            xu = X[uid-1]
             rui = row.rating
             Ai += xu[:,None] * xu[None,:]
             Vi += rui * xu
         return np.linalg.solve(Ai,Vi)
+        
+    def pred(self):
+        self.test_df["rating_pred"] = self.test_df.apply(lambda row: 
+            self.X[row.user_id-1].dot(self.Y[row.item_id-1]),axis=1)
     
-    print("Begin groupby")
-    grouped_by_userid = df_train.groupby(['user_id'])
-    print("2th groupby")
-    grouped_by_itemid = df_train.groupby(['item_id'])
-    print("Begin iteration")
-    
-    for _ in range(30):
-        t1 = time.time()
-        for user in range(n_users):
-            uid = user + 1
-            Du = grouped_by_userid.get_group(uid)
-            X[user] = findXu(Y,Du)
-        for item in range(n_items):
-            iid = item + 1
-            Di = grouped_by_itemid.get_group(iid)
-            Y[item] = findYi(X,Di)
-        t2 = time.time()
-        print(str(_)+"-th iteration, time: "+str(t2-t1))
-    return X, Y
-    
-
-
-
-
-
-
-#if __name__ == "__main__":
-#    print("haha")
+    def get_RMSE(self):
+        r_pred = self.test_df["rating_pred"]
+        r_real = self.test_df["rating"]
+        rmse = np.sqrt(((r_pred - r_real)**2).mean())
+        return rmse

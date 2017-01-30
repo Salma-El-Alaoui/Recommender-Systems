@@ -170,7 +170,7 @@ class DataSet:
         @Return:
         --------
         train_set_df, test_set_observed_df, test_set_heldout_df -- if strong generalization approach
-        train_set_df, test_set_df                               -- if weak generalization approach
+        train_set_df, test_set_df         , 0                   -- if weak generalization approach
 
         @Infos:
         -------
