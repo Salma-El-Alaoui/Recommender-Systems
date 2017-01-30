@@ -1,190 +1,460 @@
-import sys
-import os
+import io
+import csv
+import pandas as pd
 import numpy as np
-import math
-from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
-import time
+from io import BytesIO
+from zipfile import ZipFile
+from urllib.request import urlopen
+from functools import lru_cache
+from pathlib import Path
 
-# Add parent directory to python path
-PACKAGE_PARENT = '..'
-SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
-sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
+class DataSet:
 
-from data_fetching.data_set import DataSet
+    #############
+    # INTERFACE #
+    #############
 
+    """
+    // How to use //
 
-class GpMf():
-    def __init__(self, latent_dim, nb_data):
-        self.latent_dim = latent_dim
-        self.nb_data = nb_data
-        self.X = np.random.normal(0, 1e-3, (nb_data, latent_dim))
-        self.lin_variance = 1.0
-        self.bias_variance = 0.11
-        self.white_variance = 5.0
-        self.y = None
-        self.rated_items = None
+    Initialize the class with a dataset ('movielens', 'jester' or 'toy'), e.g:
+    ds = DataSet(dataset='movielens')
 
-    def log_likelihood(self):
-        """return the log likelihood of the model"""
-        Cj_invy, logDetC = self.invert_covariance()
-        yj = np.asmatrix(self.y).T
-        Nj = len(self.rated_items)
-        likelihood = - 0.5 * (Nj * np.log(2 * math.pi) + logDetC + yj.T.dot(Cj_invy))
-        return float(likelihood)
+    Once loaded, to get the dataframe with columns = [ user_id, item_id, rating ]:
+    df = ds.get_df()
 
-    def invert_covariance(self, gradient=False, nonlinear = False, kernel=linear_kernel):
-        q = self.latent_dim
-        Nj = len(self.rated_items)
-        Xj = np.asmatrix(self.X[self.rated_items, :])
-        yj = np.asmatrix(self.y).T
-        s_n = self.white_variance
-        s_w = self.lin_variance
-        s_b = self.bias_variance
-        sigNoise = s_w / s_n
+    If the toy dataset was chosen, one can access the full dataset:
+    df_complete = ds.get_df_complete()
 
-        if Nj > q and not nonlinear: # we use the matrix inversion lemma
-            XTX = Xj.T * Xj
-            B = np.eye(q) + sigNoise * XTX
-            Binv = np.linalg.pinv(B)
-            _, logdetB = np.linalg.slogdet(B)
-            if gradient:
-                AinvX = (Xj - sigNoise * Xj * (Binv * XTX)) / s_n
-                AinvTr = (Nj - sigNoise * (np.multiply(Xj * Binv, Xj)).sum()) / s_n
-            Ainvy = (yj - sigNoise * Xj * (Binv * (Xj.T * yj))) / s_n
-            sumAinv = (np.ones((Nj, 1)) - sigNoise * Xj * (Binv * Xj.sum(axis=0).T)) / s_n  # this is Nx1
-            sumAinvSum = sumAinv.sum()
-            denom = 1 + s_b * sumAinvSum
-            fact = s_b / denom
-            if gradient:
-                CinvX = AinvX - fact * sumAinv * (sumAinv.T * Xj)
-                CinvSum = sumAinv - fact * sumAinv * sumAinvSum
-                CinvTr = AinvTr - fact * sumAinv.T * sumAinv
+    Instead of the dataframe, one can get the dense rating matrix:
+    dense_matrix = DataSet.df_to_matrix(df)
+    
+    To get some infos on the df, run:
+    ds.get_description()
 
-            Cinvy = Ainvy - fact * sumAinv * float(sumAinv.T * yj)
-            if not gradient:
-                logdetA = Nj * np.log(s_n) + logdetB
-                logdetC = logdetA + np.log(denom)
+    To get a train / test dataframe:
+    train_df, test_df = ds.split_train_test(False)
 
-        else :
-            C = s_w * kernel(Xj, Xj)
-            C = C + s_b + s_n * np.eye(Nj)
-            Cinv = np.linalg.pinv(C)
-            Cinvy = Cinv * yj
-            if gradient:
-                CinvX = Cinv * Xj
-                CinvTr = np.trace(Cinv)
-                CinvSum = Cinv.sum(axis=1)
-            else:
-                _, logdetC = np.linalg.slogdet(C)
+    Once the model trained, U and V built, one can get the prediction dataframe:
+    pred_df = DataSet.U_V_to_df(U, V, None, test_df)
 
-        if gradient:
-            return Cinvy, CinvSum, CinvX, CinvTr
+    Finally, to assess the accuracy of the model:
+    score = DataSet.get_score(test_df, pred_df)
+    """
+
+    ####################
+    # Static variables #
+    ####################
+
+    ## Column names
+    USER_ID = 'user_id'
+    ITEM_ID = 'item_id'
+    RATING = 'rating'
+    TIMESTAMP = 'timestamp'
+
+    ## Dataset constants
+    DATASETS = ['movielens', 'jester', 'toy'] ## All datasets
+    DATASETS_WITH_SIZE = ['movielens']
+    DATASETS_TO_BE_FETCHED = ['movielens', 'jester']
+    SIZE = ['S', 'M', 'L']
+
+    
+    ###############
+    # Constructor #
+    ###############
+
+    def __init__(self, dataset='movielens', size='S', u=100, i=1000, u_unique=10, i_unique=5, density=0.2, noise=0.3, score_low=1, score_high=5, strong_gen=False, train_size=0.8):
+        """
+        @Parameters:
+        ------------
+        dataset: String -- 'movielens' or 'jester' or 'toy'
+        size:    String -- 'S', 'M' or 'L'(only for 'movielens')
+        u, i, u_unique, i_unique, density, noise, score_low, score_high -- See get_df_toy (only for toy dataset)
+
+        @Infos:
+        -------
+        For movielens:
+            -> Size = S:   100K ratings,  1K users, 1.7K movies, ~   2MB, scale: [ 1  , 5 ], density:
+            -> Size = M:     1M ratings,  6K users,   4K movies, ~  25MB, scale: [ 1  , 5 ], density: 4.26%
+            -> Size = L:    10M ratings, 72K users,  10K movies, ~ 265MB, scale: [0.5 , 5 ], density: 0.52%
+
+            All users have rated at least 20 movies no matter the size of the dataset
+
+        For jester:
+            -> Uniq. size: 1.7M ratings, 60K users,  150  jokes, ~  33MB, scale: [-10 , 10], density: 31.5%
+               Values are continuous.
+        """
+
+        self.dataset = dataset
+
+        # Check inputs
+        if dataset not in DataSet.DATASETS:
+            raise NameError("This dataset is not allowed.")
+        if size not in DataSet.SIZE and dataset in DataSet.DATASETS_WITH_SIZE:
+            raise NameError("This size is not allowed.")
+
+        # Configure parameters
+        if dataset in DataSet.DATASETS_TO_BE_FETCHED:
+            self.__set_params_online_ds(dataset, size)
         else:
-            return Cinvy, logdetC
+            self.__set_params_toy_ds(u, i, u_unique, i_unique, density, noise, score_low, score_high)
 
-    def log_likelihood_grad(self, ):
-        """Computes the gradient of the log likelihood"""
-        s_w = self.lin_variance
-        s_b = self.bias_variance
-        s_n = self.white_variance
+        self.df, self.df_complete = self.__set_df()
+        self.nb_users = len(np.unique(self.df[DataSet.USER_ID]))
+        self.nb_items = len(np.unique(self.df[DataSet.ITEM_ID]))
+        self.low_user = np.min(self.df[DataSet.USER_ID])
+        self.high_user = np.max(self.df[DataSet.USER_ID])
+        self.low_rating = np.min(self.df[DataSet.RATING])
+        self.high_rating = np.max(self.df[DataSet.RATING])
 
-        yj = np.asmatrix(self.y).T
-        Xj = np.asmatrix(self.X[self.rated_items, :])
+        #Train and test set
+        self.df_train, self.df_test, self.df_heldout = self.split_train_test(strong_generalization=strong_gen, train_size=train_size)
+        self.nb_users_train = len(np.unique(self.df_train[DataSet.USER_ID]))
+        self.nb_items_train = len(np.unique(self.df_train[DataSet.ITEM_ID]))
+        
+    ##################
+    # Public methods #
+    ##################
 
-        Cinvy, CinvSum, CinvX, CinvTr = self.invert_covariance(gradient=True)
-        covGradX = 0.5 * (Cinvy * (Cinvy.T * Xj) - CinvX)
-        gX = s_w * 2.0 * covGradX
-        gsigma_w = np.multiply(covGradX, Xj).sum()
-        CinvySum = Cinvy.sum()
-        CinvSumSum = CinvSum.sum()
-        gsigma_b = 0.5 * (CinvySum * CinvySum - CinvSumSum)
-        gsigma_n = 0.5 * (Cinvy.T * Cinvy - CinvTr)
-        return gX, float(gsigma_w), float(gsigma_b), float(gsigma_n)
+    def get_items_user(self, user):
+        """
+        returns indices of items rated by this user
+        """
+        users = self.df_train.groupby([DataSet.USER_ID])
+        return users.get_group(user)[DataSet.ITEM_ID].values
 
-    def objective(self):
-        return -self.log_likelihood()
+    def get_ratings_user(self, user):
+        """
+        returns observed ratings by this user
+        """
+        users = self.df_train.groupby([DataSet.USER_ID])
+        return users.get_group(user)[DataSet.RATING].values
+
+    def get_users(self):
+        return np.unique(self.df_train[DataSet.USER_ID])
+
+    def get_users_test(self):
+        return np.unique(self.df_test[DataSet.USER_ID])
+
+    def get_item_test(self, user):
+        return int(self.df_test.loc[self.df_test[DataSet.USER_ID] == user, DataSet.ITEM_ID])
+
+    def get_rating_test(self, user):
+        return float(self.df_test.loc[self.df_test[DataSet.USER_ID] == user, DataSet.RATING])
+
+    def get_df(self):
+        return self.df
+
+    def get_df_train(self):
+        return self.df_train
+
+    def get_df_test(self):
+        return self.df_test
+
+    def get_df_heldout(self):
+        return self.df_heldout
+
+    def get_df_complete(self):
+        # Only for toy dataset
+        return self.df_complete
+
+    def split_train_test(self, strong_generalization = True, train_size = 0.8):
+        """
+        @Parameters:
+        ------------
+        strong_generalization: Boolean          -- If false, weak generalization approach
+        train_size:            Float in [0, 1]  -- Only for strong_generalization
+
+        @Return:
+        --------
+        train_set_df, test_set_observed_df, test_set_heldout_df -- if strong generalization approach
+        train_set_df, test_set_df                               -- if weak generalization approach
+
+        @Infos:
+        -------
+        In a nutshell:
+        Weak generalization --> For each user, one rating is held out (test set), the other ratings = training set
+        Strong generalization --> User set is divided in training set / test set. The model is trained using all 
+                                  data available in training set. Test set is then divided in observed values/held out
+                                  values. Predictions have to be made on the test set on held out values, based on 
+                                  observed values using the model trained on the training set.
+        For more information : https://people.cs.umass.edu/~marlin/research/thesis/cfmlp.pdf - Section 3.3
+        """
+        unique_user_id = np.unique(self.df[DataSet.USER_ID])
+        if strong_generalization:
+            user_id_train_set = np.random.choice(unique_user_id, size=int(train_size*len(unique_user_id)), replace=False)
+            user_id_test_set  = np.setdiff1d(unique_user_id, user_id_train_set)
+            train_set_df = self.df[self.df[DataSet.USER_ID].isin(user_id_train_set)]
+            test_set_df = self.df[~self.df[DataSet.USER_ID].isin(user_id_train_set)]
+            idx_heldout_test_set = [np.random.choice(test_set_df[test_set_df[DataSet.USER_ID] == idx].index) for idx in user_id_test_set]
+            test_set_heldout_df  = test_set_df.loc[idx_heldout_test_set]
+            test_set_observed_df = test_set_df.loc[np.setdiff1d(test_set_df.index, idx_heldout_test_set)]
+            return train_set_df, test_set_observed_df, test_set_heldout_df
+        else:
+            # Weak generalization
+            idx_heldout_test_set = [np.random.choice(self.df[self.df[DataSet.USER_ID] == idx].index) for idx in unique_user_id]
+            test_set_df = self.df.loc[idx_heldout_test_set]
+            train_set_df = self.df.loc[np.setdiff1d(self.df.index, idx_heldout_test_set)]
+            return train_set_df, test_set_df, 0
+
+    def get_CV_set(self, fold = 5):
+        df = self.get_df_train()
+        unique_user_id = np.unique(df[DataSet.USER_ID])
+
+        def split_CV(arr, fold):
+            idx = [int(np.round(i*len(arr)/fold)) for i in range(fold)]
+            return [arr[idx[k]:idx[k+1] if k < fold - 1 else None] for k in range(fold)]
+
+        idx_CV = [split_CV(np.random.permutation(df[df[DataSet.USER_ID] == idx].index), fold) for idx in unique_user_id]
+        idx_CV = [np.concatenate([[idx_CV[i][j]] for i in range(len(unique_user_id))], axis=1) for j in range(fold)]
+        idx_CV = [idx_CV[i][0] for i in range(fold)]
+
+        out = []
+        for idx_test in idx_CV:
+            test_set_df = df.loc[idx_test]
+            train_set_df = df.loc[np.setdiff1d(df.index, idx_test)]
+            out.append((train_set_df, test_set_df))
+        
+        return out    
+    
+    def get_description(self):
+        return {
+            "Number of users": self.nb_users,
+            "Number of items": self.nb_items,
+            "Lowest user": self.low_user,
+            "Highest user": self.high_user,
+            "Density": self.df.shape[0] / (self.nb_items * self.nb_users),
+            "Mean of ratings": np.mean(self.df[DataSet.RATING]),
+            "Standard deviation of ratings": np.std(self.df[DataSet.RATING])
+        }
+
+    @staticmethod
+    def U_V_to_df(U, V, list_index, test_df = None):
+        """
+        @Parameters:
+        ------------
+        U:          nparray   -- shape = (#users, k)
+        V:          nparray   -- shape = (#items, k)
+        test_df:    dataframe -- columns = UserId || ItemId || Rating
+        list_index: list      -- shape = [ [user_id_1, item_id_1], [user_id_2, item_id_2], ... ]
+
+        @Return:
+        --------
+        R_hat:      Dataframe -- columns = UserId || ItemId || Rating
+
+        @Infos:
+        -------
+        This function is aimed to return all ratings for a list of tuples (user_id, item_id)
+        If such a list is not provided, it is built using test_df.
+        """
+
+        R_hat = []
+
+        if not (list_index or test_df):
+            raise ValueError('Either list_index or test_df has to be provided')
+
+        if test_df:
+            list_index = []
+            for row in test_df.values:
+                list_index.append([row[0], row[1]])
+
+        for index in list_index:
+            idx_user = index[0]
+            idx_item = index[1]
+            R_hat.append([ idx_user, idx_item, np.dot(U[idx_user,:], V[idx_item,:]) ])
+
+        return pd.DataFrame(R_hat)
+
+    @staticmethod
+    def get_score(test_df, prediction_df):
+        pred_map = {}
+        for row in prediction_df.values:
+            pred_map[str(row[0]) + '-' + str(row[1])] = row[2]
+
+        score = 0
+        for row in test_df.values:
+            score += (row[2] - pred_map[str(row[0]) + '-' + str(row[1])])**2
+
+        score /= test_df.shape[0]
+
+        return score
+
+    @staticmethod
+    def df_to_matrix(df):
+        """
+        @Parameters:
+        ------------
+        df:    DataFrame -- columns = UserId || ItemId || Rating
+
+        @Return:
+        --------
+        res:   Dense nparray,
+               shape = (# user_id, # item_id),
+               element[i][j] = rating for user_id[i], item_id[j]  if rating exists
+                               nan.                               otherwise
+        """
+        user_id_max = np.max(df[DataSet.USER_ID])
+        item_id_max = np.max(df[DataSet.ITEM_ID])
+        res = np.nan * np.zeros((user_id_max + 1, item_id_max + 1))
+        for row in df.values:
+            res[row[0]][row[1]] = row[2]
+        return res
+
+    
+    ###################
+    # Private methods #
+    ###################
+
+    def __set_params_online_ds(self, name, size):
+        # Configure url, filename, separator and columns in csv
+
+        # Change size if necessary
+        self.__size = size if self.dataset in DataSet.DATASETS_WITH_SIZE else 'unique'
+
+        if self.dataset == 'movielens':
+            self.__url_map = {
+                'S': "http://files.grouplens.org/datasets/movielens/ml-100k.zip",
+                'M': "http://files.grouplens.org/datasets/movielens/ml-1m.zip",
+                'L': "http://files.grouplens.org/datasets/movielens/ml-10m.zip"
+            }
+
+            self.__filename_map = {
+                'S': "ml-100k/u.data",
+                'M': "ml-1m/ratings.dat",
+                'L': "ml-10M100K/ratings.dat"
+            }
+
+            self.__separator_map = {
+                'S': '\t',
+                'M': '::',
+                'L': '::'
+            }
+
+            self.__columns_map = {
+                'S': [DataSet.USER_ID, DataSet.ITEM_ID, DataSet.RATING, DataSet.TIMESTAMP],
+                'M': [DataSet.USER_ID, DataSet.ITEM_ID, DataSet.RATING, DataSet.TIMESTAMP],
+                'L': [DataSet.USER_ID, DataSet.ITEM_ID, DataSet.RATING, DataSet.TIMESTAMP]
+            }
+
+        if self.dataset == 'jester':
+            self.__url_map = {
+                'unique': "http://eigentaste.berkeley.edu/dataset/jester_dataset_2.zip",
+            }
+
+            self.__filename_map = {
+                'unique': "jester_ratings.dat",
+            }
+
+            self.__separator_map = {
+                'unique': '\t\t'
+            }
+
+            self.__columns_map = {
+                'unique': [DataSet.USER_ID, DataSet.ITEM_ID, DataSet.RATING],
+            }
+
+    def __set_params_toy_ds(self, u, i, u_unique, i_unique, density, noise, score_low, score_high):
+        self.__u = u
+        self.__i = i
+        self.__u_unique = u_unique
+        self.__i_unique = i_unique
+        self.density = density
+        self.__noise = noise
+        self.score_low = score_low
+        self.score_high = score_high
+
+    @lru_cache(maxsize=256)
+    def __set_df(self):
+        """
+        @Return:
+        --------
+        df:      DataFrame -- columns = UserId || ItemId || Rating
+
+        """
+        # Load data in memory
+        if self.dataset in DataSet.DATASETS_TO_BE_FETCHED:
+            csv_ondisk = Path("../../csv/" + self.__filename_map[self.__size])
+            if csv_ondisk.is_file():
+                df = pd.read_csv(csv_ondisk, sep=self.__separator_map[self.__size], header=None)
+            else:
+                url = urlopen(self.__url_map[self.__size])
+                zipfile = ZipFile(BytesIO(url.read()))
+                unzipfile = io.TextIOWrapper(zipfile.open(self.__filename_map[self.__size], 'r'))
+                df = pd.read_csv(unzipfile, sep=self.__separator_map[self.__size], header=None)
+            df.columns = self.__columns_map[self.__size]
+            df = df[[DataSet.USER_ID, DataSet.ITEM_ID, DataSet.RATING]]
+            df_complete = None
+        else:
+            df_complete, df = self.__get_df_toy(self.__u, self.__i, self.__u_unique, self.__i_unique,
+                                       self.density, self.__noise, self.score_low, self.score_high, out="dataframe")
 
 
-def fit(dataset, model, nb_iter=10, seed=42, momentum=0.9):
-    data = dataset.get_df()
-    param_init = np.zeros((1, 3))
-    X_init = np.zeros(model.X.shape)
-    for iter in range(nb_iter):
-        print("iteration", iter)
-        tic = time.time()
-        np.random.seed(seed=seed)
-        state = np.random.get_state()
-        users = np.random.permutation(dataset.get_users())
-        for user in users:
-            #print("begin user", user,  "=========================")
-            toc = time.time()
-            lr = 1e-4
-            y = dataset.get_ratings_user(user)
-            rated_items = dataset.get_items_user(user) - 1
-            model.y = y
-            model.rated_items = rated_items
-            grad_X, grad_w, grad_b, grad_n = model.log_likelihood_grad()
-            gradient_param = np.array([grad_w * model.lin_variance,
-                               grad_b * model.bias_variance,
-                               grad_n * model.white_variance])
-            param = np.log(np.array([model.lin_variance,
-                                     model.bias_variance,
-                                     model.white_variance]))
-            # update X
-            X = X_init[rated_items, :]
-            ar = lr * 10
-            X = X * momentum + grad_X * ar
-            X_init[rated_items, :] = X
-            model.X[rated_items, :] = model.X[rated_items, :] + X
+        return df, df_complete
 
-            # update variances
-            param_init = param_init * momentum + gradient_param * lr
-            param = param + param_init
-            model.lin_variance = math.exp(param[0, 0])
-            model.bias_variance = math.exp(param[0, 1])
-            model.white_variance = math.exp(param[0, 2])
-            #print("end user", user, "=========================")
+    def __get_df_toy(self, u, i, u_unique, i_unique, density, noise, score_low, score_high, out):
+        """
+        @Parameters:
+        ------------
+        u:           Integer   -- Number of users
+        i:           Integer   -- Number of items
+        u_unique:    Integer   -- Number of user's type
+        i_unique:    Integer   -- Number of item's type
+        density:     Float     -- Percentage of non-nan values
+        noise:       Float     -- Each rating is r_hat(i,j) = r(i,j) + N(0, noise) where N is the Gaussian distribution
+        score_low:   Integer   -- The minimum rating
+        score_high:  Integer   -- The maximum rating
+        out:         String    -- 'matrix' of 'dataframe'
 
-        print("end iteration", iter,  "=========================")
-        print("duration iteration", time.time() - tic)
-    return model
+        @Return:
+        --------
+        df:          DataFrame -- columns = UserId || ItemId || Rating
+        OR
+        matrix:      nparray   -- with some nan values depending on density parameter
 
+        @Infos:
+        -------
+        We consider that each user u has a definite (and random) type t_user(u), from (0, 1, 2, ..., u_unique - 1),
+        that caracterizes the user. Each item i has a definite type t_item(i) too, from (0, 1, ..., i_unique - 1).
+        We then pick a rating r(t_user, t_item) from Unif(score_low, score_high) for all tuples (t_user, t_item).
+        All rating r_hat(i, j) = r_hat(t_user(i), t_item(i)) = r(t_user(i), t_item(i)) + N(0, noise) where N is the
+        Gaussian distribution.
+        """
+        # Array of user, there are u users, each user has a type from (0, 1, ..., u_unique - 1)
+        X = np.random.randint(u_unique, size=u)
+        # Array of item, there are i items, each item has a type from (0, 1, ..., i_unique - 1)
+        Y = np.random.randint(i_unique, size=i)
 
-def predict(user, test_items, model, dataset):
-    y = dataset.get_ratings_user(user)
-    rated_items = dataset.get_items_user(user) - 1
-    model.rated_items = rated_items
-    model.y = y
-    X_test = np.asmatrix(model.X[test_items, :])
-    X = np.asmatrix(model.X[model.rated_items, :])
-    Cinvy, CinvSum, CinvX, CinvTr = model.invert_covariance(gradient=True)
-    mean = model.lin_variance* X_test*(X.T*Cinvy) + Cinvy.sum() * model.bias_variance
-    return mean
+        # To get the rating between user u (type tu) and item i (type ti), we build a matrix that
+        # associates a random rating between all types tu and ti
+        rating_unique_matrix = np.random.randint(low=score_low, high=score_high + 1, size=(u_unique, i_unique))
 
+        # We then build the rating matrix
+        # Each ratings is r_hat(i,j) = r(i,j) + N(0, noise)
+        ratings = np.round(
+                    np.clip(
+                      np.fromfunction(
+                                      np.vectorize(lambda i, j: rating_unique_matrix[X[i]][Y[j]] + (np.random.normal(0, noise) if noise > 0 else 0)),
+                                      (u, i),
+                                      dtype=int
+                                     ),
+                          score_low,
+                          score_high
+                           ),
+                         2)
 
-def perf_weak(dataset=DataSet(), base_dim=11):
-    print(dataset.get_description())
-    model_init = GpMf(latent_dim=base_dim, nb_data=dataset.nb_items)
-    model = fit(dataset=dataset, model=model_init)
-    predictions = []
-    true_ratings = []
-    test_users = dataset.get_users_test()
-    nb_users_test = len(test_users)
-    print("nb_users", nb_users_test)
-    count = 0
-    for user in test_users:
-        prediction = predict(user, dataset.get_item_test(user) - 1, model, dataset)
-        if prediction > dataset.high_rating:
-            prediction = dataset.high_rating
-        if prediction < dataset.low_rating:
-            prediction = dataset.low_rating
-        predictions.append(prediction)
-        rating = dataset.get_rating_test(user)
-        true_ratings.append(rating)
-        count += 1
-        print(count, "over ", nb_users_test, "users")
-    rmse = np.linalg.norm(np.asarray(predictions) - np.asarray(true_ratings)) / np.sqrt(nb_users_test)
-    print(rmse)
+        # We apply the density parameter
+        ratings_nan = np.where(np.random.binomial(1, density, size=(u, i)) == 0, np.nan, 1)*ratings
 
+        if out == 'matrix':
+            return ratings, ratings_nan
 
-perf_weak()
+        not_nan_index = np.argwhere(~np.isnan(ratings_nan))
+        df_nan = pd.DataFrame(not_nan_index)
+        df_nan.columns = [DataSet.USER_ID, DataSet.ITEM_ID]
+        df_nan[DataSet.RATING] = df_nan.apply(lambda row: ratings_nan[row[DataSet.USER_ID]][row[DataSet.ITEM_ID]], axis=1)
+
+        df = pd.DataFrame([[user, item] for user in range(u) for item in range(i)])
+        df.columns = [DataSet.USER_ID, DataSet.ITEM_ID]
+        df[DataSet.RATING] = df.apply(lambda row: ratings[row[DataSet.USER_ID]][row[DataSet.ITEM_ID]], axis=1)
+
+        return df, df_nan
