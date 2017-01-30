@@ -321,7 +321,7 @@ class DataSet:
             self.__filename_map = {
                 'S': "ml-100k/u.data",
                 'M': "ml-1m/ratings.dat",
-                'L': "ml-10m/ratings.dat"
+                'L': "ml-10M100K/ratings.dat"
             }
 
             self.__separator_map = {
