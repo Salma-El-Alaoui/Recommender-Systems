@@ -204,7 +204,7 @@ class DataSet:
         else:
             # Weak generalization
             idx_heldout_test_set = [np.random.choice(self.df[self.df[DataSet.USER_ID] == idx].index) for idx in unique_user_id]
-            idx_unique_user_selected = np.concatenate([df[df[DataSet.USER_ID] == idx].index for idx in unique_user_id]) 
+            idx_unique_user_selected = np.concatenate([self.df[self.df[DataSet.USER_ID] == idx].index for idx in unique_user_id])
             test_set_df = self.df.loc[idx_heldout_test_set]
             train_set_df = self.df.loc[np.setdiff1d(idx_unique_user_selected, idx_heldout_test_set)]
             return train_set_df, test_set_df, None

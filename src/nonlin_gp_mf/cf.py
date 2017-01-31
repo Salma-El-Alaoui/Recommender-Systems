@@ -163,7 +163,12 @@ def predict(user, test_items, model, dataset):
 
 
 def perf_weak(dataset=DataSet(dataset="movielens", size="M"), base_dim=11):
-    print(dataset.get_description())
+
+    if dataset.dataset == "movielens":
+        norm_coeff = 1.6
+    else :
+        norm_coeff = 6.67
+    print("dataset desctiption", dataset.get_description())
     model_init = GpMf(latent_dim=base_dim, nb_data=dataset.item_index_range)
     model = fit(dataset=dataset, model=model_init)
     predictions = []
@@ -186,7 +191,7 @@ def perf_weak(dataset=DataSet(dataset="movielens", size="M"), base_dim=11):
     predictions = np.asarray(predictions)
     true_ratings = np.asarray(true_ratings)
     rmse = np.linalg.norm(predictions - true_ratings) / np.sqrt(nb_users_test)
-    nmae = 1. / (len(predictions) * (dataset.high_rating - dataset.low_rating)) * np.sum(np.abs(true_ratings - prediction))
+    nmae = np.sum(np.abs(true_ratings - predictions)) * 1. / (len(predictions) * norm_coeff)
     print("rmse", rmse)
     print("nmae", nmae)
     return rmse, nmae
