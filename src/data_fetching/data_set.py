@@ -7,6 +7,8 @@ from zipfile import ZipFile
 from urllib.request import urlopen
 from functools import lru_cache
 from pathlib import Path
+import warnings
+warnings.filterwarnings("ignore")
 
 class DataSet:
 
