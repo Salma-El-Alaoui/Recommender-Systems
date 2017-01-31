@@ -206,7 +206,7 @@ class DataSet:
             idx_unique_user_selected = np.concatenate([df[df[DataSet.USER_ID] == idx].index for idx in unique_user_id]) 
             test_set_df = self.df.loc[idx_heldout_test_set]
             train_set_df = self.df.loc[np.setdiff1d(idx_unique_user_selected, idx_heldout_test_set)]
-            return train_set_df, test_set_df, 0
+            return train_set_df, test_set_df, None
 
     def get_CV_set(self, fold = 5):
         df = self.get_df_train()
