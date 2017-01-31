@@ -52,12 +52,15 @@ class ALS_WR():
         print("ALS-WR begins...\n")
         for i in range(n_iter):
             t1 = time.time()
+            
+            # X = argmin...
             for uid in self.user_id_unique:
-                Du = self.grouped_by_userid.get_group(uid)
-                self.X[uid-1] = self.__find_Xu(self.Y,Du)
+                self.X[uid-1] = self.__find_Xu(uid)
+                
+            # Y = argmin...
             for iid in self.item_id_unique:
-                Di = self.grouped_by_itemid.get_group(iid)
-                self.Y[iid-1] = self.__find_Yi(self.X,Di)
+                self.Y[iid-1] = self.__find_Yi(iid)
+                
             t2 = time.time()
             delta_t = t2 - t1
             self.time_for_each_iter.append(delta_t)
@@ -67,7 +70,9 @@ class ALS_WR():
             self.pred()
             rmse = self.get_RMSE()
             self.RMSE_test_after_each_iter.append(rmse)
-            print("Current RMSE: %.4f \n" % rmse)
+            t3 = time.time()
+            print("Current RMSE: %.4f" % rmse)
+            print("Time used for get_RMSE: %.2f\n" % (t3-t2))
             
         
     # Input
@@ -75,13 +80,14 @@ class ALS_WR():
     #   Du: pd.DataFrame corresponding to u
     # Output
     #   the feature vector x_u for user u
-    def __find_Xu(self,Y,Du):
+    def __find_Xu(self,uid):
+        Du = self.grouped_by_userid.get_group(uid)
         nu = Du.shape[0]
         Au = nu * self.lmda * np.eye(self.r)
         Vu = np.zeros(self.r)
         for index, row in Du.iterrows():
             iid = row.item_id
-            yi = Y[iid-1]
+            yi = self.Y[iid-1]
             rui = row.rating
             Au += yi[:,None] * yi[None,:]
             Vu += rui * yi
@@ -92,13 +98,14 @@ class ALS_WR():
     #   Di: pd.DataFrame corresponding to i
     # Output
     #   the feature vector y_i for item i
-    def __find_Yi(self,X,Di):
+    def __find_Yi(self,iid):
+        Di = self.grouped_by_itemid.get_group(iid)
         ni = Di.shape[0]
         Ai = ni * self.lmda * np.eye(self.r)
         Vi = np.zeros(self.r)
         for index, row in Di.iterrows():
             uid = row.user_id
-            xu = X[uid-1]
+            xu = self.X[uid-1]
             rui = row.rating
             Ai += xu[:,None] * xu[None,:]
             Vi += rui * xu
@@ -106,7 +113,7 @@ class ALS_WR():
         
     def pred(self):
         self.test_df["rating_pred"] = self.test_df.apply(lambda row: 
-            self.X[row.user_id-1].dot(self.Y[row.item_id-1]),axis=1)
+            self.X[int(row.user_id-1)].dot(self.Y[int(row.item_id-1)]),axis=1)
     
     def get_RMSE(self):
         r_pred = self.test_df["rating_pred"]
