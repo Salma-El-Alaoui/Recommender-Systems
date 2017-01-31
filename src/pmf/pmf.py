@@ -199,7 +199,7 @@ if __name__ == "__main__":
     ds_v= ds.get_df()
     ratings = ds_v.values
     print(len(np.unique(ratings[:, 0])), len(np.unique(ratings[:, 1])), pmf.num_latent_feat)
-    train_init, test_init, _ = ds.split_train_test(strong_generalization = True, train_size = 0.8)
+    train_init, test_init, _ = ds.split_train_test(strong_generalization=False, train_size = 0.8)
     train = train_init.values
     test = test_init.values
     pmf.fit(train, test)
