@@ -63,7 +63,7 @@ class DataSet:
     # Constructor #
     ###############
 
-    def __init__(self, dataset='movielens', size='S', u=100, i=1000, u_unique=10, i_unique=5, density=0.2, noise=0.3, score_low=1, score_high=5, strong_gen=False, train_size=0.8):
+    def __init__(self, dataset='movielens', size='S', u=100, i=1000, u_unique=10, i_unique=50, density=0.2, noise=0.3, score_low=1, score_high=5, strong_gen=False, train_size=0.8):
         """
         @Parameters:
         ------------
@@ -182,13 +182,15 @@ class DataSet:
                                   observed values using the model trained on the training set.
         For more information : https://people.cs.umass.edu/~marlin/research/thesis/cfmlp.pdf - Section 3.3
         """
+        # Select user_id
         unique_user_id = np.random.permutation(np.unique(self.df[DataSet.USER_ID]))
         if type(users_size) == float and users_size <= 1. and users_size >= 0.:
-            unique_user_id = unique_user_id[:int(users_size*len(users_size))]
-        elif type(users_size) == int and users_size >= 1 and users_size <= len(users_size):
+            unique_user_id = unique_user_id[:int(users_size*len(unique_user_id))]
+        elif type(users_size) == int and users_size >= 1 and users_size <= len(unique_user_id):
             unique_user_id = unique_user_id[:users_size]
         else:
             raise ValueError('The users_size value is not allowed')
+
         if strong_generalization:
             user_id_train_set = np.random.choice(unique_user_id, size=int(train_size*len(unique_user_id)), replace=False)
             user_id_test_set  = np.setdiff1d(unique_user_id, user_id_train_set)
@@ -201,8 +203,9 @@ class DataSet:
         else:
             # Weak generalization
             idx_heldout_test_set = [np.random.choice(self.df[self.df[DataSet.USER_ID] == idx].index) for idx in unique_user_id]
+            idx_unique_user_selected = np.concatenate([df[df[DataSet.USER_ID] == idx].index for idx in unique_user_id]) 
             test_set_df = self.df.loc[idx_heldout_test_set]
-            train_set_df = self.df.loc[np.setdiff1d(self.df.index, idx_heldout_test_set)]
+            train_set_df = self.df.loc[np.setdiff1d(idx_unique_user_selected, idx_heldout_test_set)]
             return train_set_df, test_set_df, 0
 
     def get_CV_set(self, fold = 5):
