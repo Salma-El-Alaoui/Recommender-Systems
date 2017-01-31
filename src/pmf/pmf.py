@@ -5,6 +5,14 @@ Created on Tue Jan 24 13:37:57 2017
 @author: Sophia
 """
 
+
+"""
+This class implements Probabilistic Matrix factorization with fixed priors (PMF), described in:
+    Ruslan Salakhutdinov and Andriy Mnih Department of Computer Science, University of .
+    "Bayesian probabilistic matrix factorization using markov chain monte carlo"
+    Proceedings of the 25th international conference on Machine learning, ACM, 2008, pp. 880.
+"""
+
 # -*- coding: utf-8 -*-
 import numpy as np
 import matplotlib.pyplot as plt
@@ -191,7 +199,7 @@ if __name__ == "__main__":
     ds_v= ds.get_df()
     ratings = ds_v.values
     print(len(np.unique(ratings[:, 0])), len(np.unique(ratings[:, 1])), pmf.num_latent_feat)
-    train_init, test_init, _ = ds.split_train_test(strong_generalization = False, train_size = 0.8)
+    train_init, test_init, _ = ds.split_train_test(strong_generalization = True, train_size = 0.8)
     train = train_init.values
     test = test_init.values
     pmf.fit(train, test)
@@ -207,6 +215,14 @@ if __name__ == "__main__":
     plt.show()
     
     
+    """
+    @Impact of parameters on the performance of the algorithme:
+    Please uncomment each of the following to visualize the result
+        Plot 1 : Impact of the number of latent features
+        Plot 2 : Selection of teh suitable number of latent features given all other parameters fixed
+        Plot 3 : Impact of the batch size
+    
+    ----------------------------------------------------------------
     #Plot RMSE according to Number of latent features to show the sensitivity of PMF to the number of latent features
     D= range(10,50,2)
     R=[]
@@ -222,8 +238,9 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid()
     plt.show()
+    ----------------------------------------------------------------
     
-    
+    ----------------------------------------------------------------
     #Plot RMSE according to Number of latent features on both train and test sets to select the best value given
     #all the other parameters fixed.
     D= range(5,50,3)
@@ -243,7 +260,9 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid()
     plt.show()
+    ----------------------------------------------------------------
     
+    ----------------------------------------------------------------
     #Plot RMSE according to the batch size on train and test sets to select the best value given
     #all the other parameters fixed.
     D= [10, 100, 300, 500, 1000, 3000, 5000]
@@ -263,7 +282,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid()
     plt.show()
-    
-    
+    ----------------------------------------------------------------
+    """
     
 
