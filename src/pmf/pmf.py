@@ -22,8 +22,8 @@ sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 from data_fetching.data_set import DataSet
 
 class PMF(object):
-    def __init__(self, num_latent_feat=15, learning_rate=1, _lambda=0.1, momentum=0.9, maxepoch=100, num_batches=10,
-                 batch_size=1000):
+    def __init__(self, num_latent_feat=100, learning_rate=1, _lambda=0.1, momentum=0.9, maxepoch=10, num_batches=100,
+                 batch_size=10000):
         """
         @Parameters:
         ------------
@@ -60,6 +60,7 @@ class PMF(object):
 
     #Fit the PMF model with SGD as the optimization algorithm
     def fit(self, train_set, test_set):
+        t_init=time.time()
         #get the average of ratings to center the data
         self.mean_inv = np.mean(train_set[:, 2]) 
         
@@ -83,14 +84,18 @@ class PMF(object):
             self.U_inc = np.zeros((num_user, self.num_latent_feat))
 
         while self.epoch < self.maxepoch:
+            #t_i_epoch = time.time()
             self.epoch += 1
-
+            
             # Shuffling for SGD
             shuffled_order = np.arange(train_set.shape[0])
             np.random.shuffle(shuffled_order)  
 
             # Batch update
             for batch in range(self.num_batches):
+                
+                t_i_epoch=time.time()
+                
                 batch_idx = np.mod(np.arange(self.batch_size * batch, self.batch_size * (batch + 1)),
                                    shuffled_order.shape[0])  
                 batch_invID = np.array(train_set[shuffled_order[batch_idx], 0], dtype='int32')
@@ -128,7 +133,7 @@ class PMF(object):
                     rawErr = pred_out - train_set[:, 2] + self.mean_inv
                     obj = LA.norm(rawErr) ** 2 + 0.5 * self._lambda * (LA.norm(self.U) ** 2 + LA.norm(self.V) ** 2)
                     self.err_train.append(np.sqrt(obj / tr_shape))
-
+                
                 # Compute RMSE
                 if batch == self.num_batches - 1:
                     pred_out = np.sum(np.multiply(self.U[np.array(test_set[:, 0], dtype='int32'), :],
@@ -144,22 +149,45 @@ class PMF(object):
                     print('Training RMSE: %f, Test RMSE %f' % (self.err_train[-1], self.err_val[-1]))
                     self.train_rmse.append(self.err_train[-1])
                     self.test_rmse.append(self.err_val[-1])
-        
+                    t_f_epoch=time.time()
+                    print("Time used for this epoch: %s" % (t_f_epoch-t_i_epoch))
+                
+            
+        t_final=time.time()
+        print("Time excecution: %s" % (t_final-t_init))
+                    
         #Retrieve the best RMSE
         print('RMSE min')
         min_rmse = min(self.test_rmse)
         print('Test set minimal RMSE %f' % min_rmse)
-        return min_rmse
+        return self.train_rmse[-1],self.test_rmse[-1]
+        
+        
                     
     #Predict rating of item for user
     def predict(self, invID):
         return np.dot(self.V, self.U[int(invID), :]) + self.mean_inv  
+        
+        
+#-------------------------------------------------------------------------------------------------------------------
+#Main
+"""
+In order to select which dataset to test, only decomment one of the following lines and select either S or M 
+for movielens:
 
-
-if __name__ == "__main__":
-    pmf = PMF()
-    ds = DataSet(dataset='movielens', size ='S')
+    #ds = DataSet(dataset='movielens', size ='S')
     #ds = DataSet(dataset='jester')
+    #ds = DataSet(dataset='toy')
+
+The parameters can be modified either on _init or using pmf(...)
+"""
+if __name__ == "__main__":
+    
+    #Compute the RMSE by epoch as well as the excecution and epoch times
+    pmf = PMF()
+    #ds = DataSet(dataset='movielens', size ='S')
+    ds = DataSet(dataset='jester')
+    #ds = DataSet(dataset='toy')
     ds_v= ds.get_df()
     ratings = ds_v.values
     print(len(np.unique(ratings[:, 0])), len(np.unique(ratings[:, 1])), pmf.num_latent_feat)
@@ -167,7 +195,7 @@ if __name__ == "__main__":
     train = train_init.values
     test = test_init.values
     pmf.fit(train, test)
-
+    
     # Plot train and test errors
     plt.plot(range(pmf.maxepoch), pmf.train_rmse, marker='o', label='Training Data')
     plt.plot(range(pmf.maxepoch), pmf.test_rmse, marker='v', label='Test Data')
@@ -178,8 +206,9 @@ if __name__ == "__main__":
     plt.grid()
     plt.show()
     
-    #Plot RMSE according to Number of latent features
-    D= range(10,15)
+    
+    #Plot RMSE according to Number of latent features to show the sensitivity of PMF to the number of latent features
+    D= range(10,50,2)
     R=[]
     for i in D:
         pmf = PMF(num_latent_feat=i)
@@ -193,6 +222,48 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid()
     plt.show()
+    
+    
+    #Plot RMSE according to Number of latent features on both train and test sets to select the best value given
+    #all the other parameters fixed.
+    D= range(5,50,3)
+    R=[]
+    J=[]
+    for i in D:
+        pmf = PMF(num_latent_feat=i)
+        r,j = pmf.fit(train, test)
+        R.append(r)
+        J.append(j)
+    print(R)
+    plt.scatter(D,R, pmf.train_rmse, marker='o', label='Training Data')
+    plt.scatter(D,J,pmf.train_rmse, marker='v', label='Test Data')
+    plt.title('RMSE by latent features number')
+    plt.xlabel('Number of Latent Features')
+    plt.ylabel('RMSE')
+    plt.legend()
+    plt.grid()
+    plt.show()
+    
+    #Plot RMSE according to the batch size on train and test sets to select the best value given
+    #all the other parameters fixed.
+    D= [10, 100, 300, 500, 1000, 3000, 5000]
+    R=[]
+    J=[]
+    for i in D:
+        pmf = PMF(batch_size=i)
+        r,j = pmf.fit(train, test)
+        R.append(r)
+        J.append(j)
+    print(R)
+    plt.scatter(D,R, pmf.train_rmse, marker='o', label='Training Data')
+    plt.scatter(D,J,pmf.train_rmse, marker='v', label='Test Data')
+    plt.title('RMSE by latent features number')
+    plt.xlabel('Number of Latent Features')
+    plt.ylabel('RMSE')
+    plt.legend()
+    plt.grid()
+    plt.show()
+    
     
     
 
