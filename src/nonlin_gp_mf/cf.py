@@ -1,3 +1,10 @@
+"""
+This class implements Non-linear Matrix Factorization with Gaussian Processes (NLMFGP), described in:
+    Lawrence, Neil D., and Raquel Urtasun.
+    "Non-linear matrix factorization with Gaussian processes."
+    Proceedings of the 26th Annual International Conference on Machine Learning. ACM, 2009.
+"""
+
 import sys
 import os
 import numpy as np
@@ -242,4 +249,3 @@ if __name__ == "__main__":
     #perf_weak(dataset=DataSet(dataset="toy"))
     # Jester dataset
     #perf_weak(dataset=DataSet(dataset="jester"))
-    
