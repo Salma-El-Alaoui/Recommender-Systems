@@ -162,9 +162,9 @@ def predict(user, test_items, model, dataset):
     return mean
 
 
-def perf_weak(dataset=DataSet(), base_dim=11):
+def perf_weak(dataset=DataSet(dataset="movielens", size="M"), base_dim=11):
     print(dataset.get_description())
-    model_init = GpMf(latent_dim=base_dim, nb_data=dataset.nb_items)
+    model_init = GpMf(latent_dim=base_dim, nb_data=dataset.item_index_range)
     model = fit(dataset=dataset, model=model_init)
     predictions = []
     true_ratings = []
@@ -183,8 +183,13 @@ def perf_weak(dataset=DataSet(), base_dim=11):
         true_ratings.append(rating)
         count += 1
         print(count, "over ", nb_users_test, "users")
-    rmse = np.linalg.norm(np.asarray(predictions) - np.asarray(true_ratings)) / np.sqrt(nb_users_test)
-    print(rmse)
+    predictions = np.asarray(predictions)
+    true_ratings = np.asarray(true_ratings)
+    rmse = np.linalg.norm(predictions - true_ratings) / np.sqrt(nb_users_test)
+    nmae = 1. / (len(predictions) * (dataset.high_rating - dataset.low_rating)) * np.sum(np.abs(true_ratings - prediction))
+    print("rmse", rmse)
+    print("nmae", nmae)
+    return rmse, nmae
 
 
 perf_weak()

@@ -63,7 +63,7 @@ class DataSet:
     # Constructor #
     ###############
 
-    def __init__(self, dataset='movielens', size='S', u=100, i=1000, u_unique=10, i_unique=5, density=0.2, noise=0.3, score_low=1, score_high=5, strong_gen=False, train_size=0.8):
+    def __init__(self, dataset='movielens', size='S', u=100, i=1000, u_unique=10, i_unique=5, density=0.2, noise=0.3, score_low=1, score_high=5, strong_gen=False, users_size=5000):
         """
         @Parameters:
         ------------
@@ -106,9 +106,10 @@ class DataSet:
         self.high_user = np.max(self.df[DataSet.USER_ID])
         self.low_rating = np.min(self.df[DataSet.RATING])
         self.high_rating = np.max(self.df[DataSet.RATING])
+        self.item_index_range = np.max(self.df[DataSet.ITEM_ID]) - np.min(self.df[DataSet.ITEM_ID]) + 1
 
         #Train and test set
-        self.df_train, self.df_test, self.df_heldout = self.split_train_test(strong_generalization=strong_gen, train_size=train_size)
+        self.df_train, self.df_test, self.df_heldout = self.split_train_test(strong_generalization=strong_gen, users_size=users_size)
         self.nb_users_train = len(np.unique(self.df_train[DataSet.USER_ID]))
         self.nb_items_train = len(np.unique(self.df_train[DataSet.ITEM_ID]))
         
@@ -158,7 +159,7 @@ class DataSet:
         # Only for toy dataset
         return self.df_complete
 
-    def split_train_test(self, strong_generalization = True, train_size = 0.8, users_size = 1.):
+    def split_train_test(self, strong_generalization = False, train_size = 0.8, users_size = 1.):
         """
         @Parameters:
         ------------
