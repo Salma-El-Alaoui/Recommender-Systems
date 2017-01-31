@@ -5,12 +5,20 @@ Created on Tue Jan 24 11:35:18 2017
 
 @author: Evariste
 """
-
+import sys
+import os
 import numpy as np
+import matplotlib.pyplot as plt
 import time
 import multiprocessing
 
 
+# Add parent directory to python path
+PACKAGE_PARENT = '..'
+SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
+sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
+
+from data_fetching.data_set import DataSet
 
 class ALS_WR():
     
@@ -43,9 +51,8 @@ class ALS_WR():
         self.r = r
         self.lmda = lmda
         
-        self.train_df = train_df
+        self.train_df = train_df.copy()
         self.test_df = test_df.copy()
-        self.test_df["rating_pred"] = 0
         self.n_users = max(train_df.user_id.max(),test_df.user_id.max())
         self.n_items = max(train_df.item_id.max(),test_df.item_id.max())
         self.user_id_unique = train_df.user_id.unique()
@@ -60,16 +67,20 @@ class ALS_WR():
         
         # variables memorizing the information after each iteration
         self.n_iter_carried_out = 0
-        self.RMSE_test_after_each_iter = []
         self.time_for_each_iter = []
+        self.pred()
+        initial_testing_RMSE = self.get_testing_RMSE()
+        initial_training_RMSE = self.get_training_RMSE()
+        self.RMSE_train_after_each_iter = [initial_training_RMSE]
+        self.RMSE_test_after_each_iter = [initial_testing_RMSE]
 
 
     def fit(self,n_iter=10):
         t0 = time.time()
         print("ALS-WR begins...")
         print("with r = %d, lmda = %.3f" % (self.r,self.lmda))
-        rmse = self.get_RMSE()
-        print("Initial RMSE: %.4f" % rmse)
+        print("Initial training RMSE: %.4f" % self.RMSE_train_after_each_iter[0])
+        print("Initial testing RMSE: %.4f" % self.RMSE_test_after_each_iter[0])
         
         # Parallel computation
         pool = multiprocessing.Pool()
@@ -89,23 +100,29 @@ class ALS_WR():
             for iid, Yi in li_Yi:
                 self.Y[iid-1] = Yi
             print("Y updated.")
-                
+            
+            print("%d-th iteration finished.\nCalculating training/testing RMSE..." % (self.n_iter_carried_out+1))
             t2 = time.time()
+            self.pred()
+            rmse_test = self.get_testing_RMSE()
+            rmse_train = self.get_training_RMSE()
+            self.RMSE_test_after_each_iter.append(rmse_test)
+            self.RMSE_train_after_each_iter.append(rmse_train)
             delta_t = t2 - t1
             self.time_for_each_iter.append(delta_t)
-            print("%d-th iteration finished." % (self.n_iter_carried_out+1))
+            
             self.n_iter_carried_out += 1
             print("Time used: %.2f" % delta_t)
-            self.pred()
-            rmse = self.get_RMSE()
-            self.RMSE_test_after_each_iter.append(rmse)
-            print("Current RMSE: %.4f" % rmse)
+            print("Current training RMSE: %.4f" % rmse_train)
+            print("Current testing RMSE: %.4f" % rmse_test)
         
-        final_rmse = self.RMSE_test_after_each_iter[-1]
-        print("ALS-WR finished.")
+        print("\nALS-WR finished.")
+        final_testing_rmse = self.RMSE_test_after_each_iter[-1]
+        final_training_rmse = self.RMSE_train_after_each_iter[-1]
         t1 = time.time()
         print("Total time used: %.2f" % (t1-t0))
-        print("Final RMSE: %.4f" % final_rmse)
+        print("Final training RMSE: %.4f" % final_training_rmse)
+        print("Final testing RMSE: %.4f" % final_testing_rmse)
         pool.close()
         pool.join()
         
@@ -148,10 +165,48 @@ class ALS_WR():
     def pred(self):
         self.test_df["rating_pred"] = self.test_df.apply(lambda row: 
             self.X[int(row.user_id-1)].dot(self.Y[int(row.item_id-1)]),axis=1)
+        self.train_df["rating_pred"] = self.train_df.apply(lambda row: 
+            self.X[int(row.user_id-1)].dot(self.Y[int(row.item_id-1)]),axis=1)
     
-    # Compute the RMSE with current X and Y w.r.t test_df
-    def get_RMSE(self):
+    # Compute the testing RMSE with current X and Y w.r.t test_df
+    def get_testing_RMSE(self):
         r_pred = self.test_df["rating_pred"]
         r_real = self.test_df["rating"]
         rmse = np.sqrt(((r_pred - r_real)**2).mean())
         return rmse
+        
+    # Compute the training RMSE with current X and Y w.r.t train_df
+    def get_training_RMSE(self):
+        r_pred = self.train_df["rating_pred"]
+        r_real = self.train_df["rating"]
+        rmse = np.sqrt(((r_pred - r_real)**2).mean())
+        return rmse
+
+    def plot_RMSE(self):
+        plt.plot(self.RMSE_train_after_each_iter, marker='o', label='Training RMSE')
+        plt.plot(self.RMSE_test_after_each_iter, marker='v', label='Testing RMSE')
+        plt.title('ALS-WR with r=%d and $\lambda$=%.3f' % (self.r,self.lmda))
+        plt.xlabel('Number of iterations')
+        plt.ylabel('RMSE')
+        plt.legend()
+        plt.grid()
+        plt.show()
+        
+    def get_average_time(self):
+        return np.average(self.time_for_each_iter)
+
+def perf_weak(dataset="movielens",size="M"):
+    DataSet(dataset="movielens", size="M")
+
+if __name__ == "__main__":
+    pass
+
+
+def plot_RMSE(rmse_list):
+    plt.plot(rmse_list, marker='v', label='Testing RMSE')
+    plt.title('ALS-WR with r=100 and $\lambda=0.065$')
+    plt.xlabel('Number of iterations')
+    plt.ylabel('RMSE')
+    plt.legend()
+    plt.grid()
+    plt.show()
