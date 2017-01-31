@@ -11,6 +11,7 @@ import pandas as pd
 import os
 import sys
 import time
+from multiprocessing import Pool
 
 # Add parent directory to python path
 PACKAGE_PARENT = '..'
@@ -21,7 +22,29 @@ from data_fetching.data_set import DataSet
 
 class ALS_WR():
     
-    def __init__(self,train_df,test_df,r=10,lmda=0.065):
+    """
+    // How to use //
+    
+    Let traind_df, test_df be two pandas.DataFrame objects with 3 columns [user_id,item_id,raing]
+
+    Initialize the class with:
+        
+        als = ALS_WR(train_df,test_df,r=100,lmda=0.065)
+        
+    where r is the latent dimension and lmda the penalization coefficient.
+
+    Begin the ALS iterations with:
+        
+        als.fit(n_iter=10)
+        
+    where n_iter is the number of iterations. When doing ALS iteration, the ALS_WR object
+    store information like current RMSE and time used for this iteration.
+    
+    The next time when one does als.fit(), the iteration will use current 
+    X and Y after iterations already done. This avoids repeating iterations.
+    """
+    
+    def __init__(self,train_df,test_df,r=100,lmda=0.065):
         # Hyperparameters
         # r : number of latent features
         # lmda : penalization coefficient
@@ -39,8 +62,8 @@ class ALS_WR():
         self.grouped_by_itemid = self.train_df.groupby(['item_id'])
         self.X = np.random.rand(self.n_users,r)
         self.Y = np.random.rand(self.n_items,r)
-        print("n_users: %d" % self.n_users)
-        print("n_items: %d" % self.n_items)
+        print("Number of users in the dataset: n_users = %d" % self.n_users)
+        print("Number of items in the dataset: n_items = %d" % self.n_items)
         
         # variables memorizing the information after each iteration
         self.n_iter_carried_out = 0
@@ -49,38 +72,53 @@ class ALS_WR():
 
 
     def fit(self,n_iter=10):
-        print("ALS-WR begins...\n")
+        t0 = time.time()
+        print("ALS-WR begins...")
+        print("with r = %d, lmda = %.3f" % (self.r,self.lmda))
+        rmse = self.get_RMSE()
+        print("Initial RMSE: %.4f" % rmse)
+        
         for i in range(n_iter):
+            print("\n%d-th iteration begins... \nUpdating X..." % (self.n_iter_carried_out+1))
             t1 = time.time()
             
-            # X = argmin...
-            for uid in self.user_id_unique:
-                self.X[uid-1] = self.__find_Xu(uid)
-                
-            # Y = argmin...
-            for iid in self.item_id_unique:
-                self.Y[iid-1] = self.__find_Yi(iid)
+            # Parallel computation
+            pool = Pool()
+            
+            li_Xu = pool.map(self.find_Xu, self.user_id_unique)
+            for uid, Xu in li_Xu:
+                self.X[uid-1] = Xu
+            print("X updated.")
+            
+            print("Updating Y...")
+            li_Yi = pool.map(self.find_Yi, self.item_id_unique)
+            for iid, Yi in li_Yi:
+                self.Y[iid-1] = Yi
+            print("Y updated.")
                 
             t2 = time.time()
             delta_t = t2 - t1
             self.time_for_each_iter.append(delta_t)
+            print("%d-th iteration finished." % (self.n_iter_carried_out+1))
             self.n_iter_carried_out += 1
-            print("%d-th iteration finished." % self.n_iter_carried_out)
             print("Time used: %.2f" % delta_t)
             self.pred()
             rmse = self.get_RMSE()
             self.RMSE_test_after_each_iter.append(rmse)
-            t3 = time.time()
             print("Current RMSE: %.4f" % rmse)
-            print("Time used for get_RMSE: %.2f\n" % (t3-t2))
+        
+        final_rmse = self.RMSE_test_after_each_iter[-1]
+        print("ALS-WR finished.")
+        t1 = time.time()
+        print("Total time used: %.2f " (t1-t0))
+        print("Final RMSE: %.4f" % final_rmse)
             
         
     # Input
-    #   Y: feature matrix of movies
-    #   Du: pd.DataFrame corresponding to u
+    #   uid: the user id of the latent feature vector to be updated
     # Output
-    #   the feature vector x_u for user u
-    def __find_Xu(self,uid):
+    #   uid, the feature vector
+    def find_Xu(self,uid):
         Du = self.grouped_by_userid.get_group(uid)
         nu = Du.shape[0]
         Au = nu * self.lmda * np.eye(self.r)
@@ -91,14 +129,13 @@ class ALS_WR():
             rui = row.rating
             Au += yi[:,None] * yi[None,:]
             Vu += rui * yi
-        return np.linalg.solve(Au,Vu)
+        return uid, np.linalg.solve(Au,Vu)
         
     # Input
-    #   X: feature matrix of movies
-    #   Di: pd.DataFrame corresponding to i
+    #   iid: the item id of the latent feature vector to be updated
     # Output
-    #   the feature vector y_i for item i
-    def __find_Yi(self,iid):
+    #   iid, the feature vector
+    def find_Yi(self,iid):
         Di = self.grouped_by_itemid.get_group(iid)
         ni = Di.shape[0]
         Ai = ni * self.lmda * np.eye(self.r)
@@ -109,12 +146,14 @@ class ALS_WR():
             rui = row.rating
             Ai += xu[:,None] * xu[None,:]
             Vi += rui * xu
-        return np.linalg.solve(Ai,Vi)
+        return iid, np.linalg.solve(Ai,Vi)
         
+    # Predict using current X and Y and update the column "rating_pred" in test_df
     def pred(self):
         self.test_df["rating_pred"] = self.test_df.apply(lambda row: 
             self.X[int(row.user_id-1)].dot(self.Y[int(row.item_id-1)]),axis=1)
     
+    # Compute the RMSE with current X and Y w.r.t test_df
     def get_RMSE(self):
         r_pred = self.test_df["rating_pred"]
         r_real = self.test_df["rating"]
