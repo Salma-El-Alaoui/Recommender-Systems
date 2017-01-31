@@ -7,25 +7,17 @@ Created on Tue Jan 24 11:35:18 2017
 """
 
 import numpy as np
-import pandas as pd
-import os
-import sys
 import time
-from multiprocessing import Pool
+import multiprocessing
 
-# Add parent directory to python path
-PACKAGE_PARENT = '..'
-SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
-sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 
-from data_fetching.data_set import DataSet
 
 class ALS_WR():
     
     """
     // How to use //
     
-    Let traind_df, test_df be two pandas.DataFrame objects with 3 columns [user_id,item_id,raing]
+    Let traind_df, test_df be two pandas.DataFrame objects with 3 columns [user_id,item_id,rating]
 
     Initialize the class with:
         
@@ -60,6 +52,7 @@ class ALS_WR():
         self.item_id_unique = train_df.item_id.unique()
         self.grouped_by_userid = self.train_df.groupby(['user_id'])
         self.grouped_by_itemid = self.train_df.groupby(['item_id'])
+        
         self.X = np.random.rand(self.n_users,r)
         self.Y = np.random.rand(self.n_items,r)
         print("Number of users in the dataset: n_users = %d" % self.n_users)
@@ -78,13 +71,14 @@ class ALS_WR():
         rmse = self.get_RMSE()
         print("Initial RMSE: %.4f" % rmse)
         
+        # Parallel computation
+        pool = multiprocessing.Pool()
+        
         for i in range(n_iter):
-            print("\n%d-th iteration begins... \nUpdating X..." % (self.n_iter_carried_out+1))
+            print("\n%d-th iteration begins..." % (self.n_iter_carried_out+1))
             t1 = time.time()
             
-            # Parallel computation
-            pool = Pool()
-            
+            print("Updating X...")
             li_Xu = pool.map(self.find_Xu, self.user_id_unique)
             for uid, Xu in li_Xu:
                 self.X[uid-1] = Xu
@@ -110,9 +104,11 @@ class ALS_WR():
         final_rmse = self.RMSE_test_after_each_iter[-1]
         print("ALS-WR finished.")
         t1 = time.time()
-        print("Total time used: %.2f " (t1-t0))
+        print("Total time used: %.2f" % (t1-t0))
         print("Final RMSE: %.4f" % final_rmse)
-            
+        pool.close()
+        pool.join()
+        
         
     # Input
     #   uid: the user id of the latent feature vector to be updated
@@ -124,7 +120,7 @@ class ALS_WR():
         Au = nu * self.lmda * np.eye(self.r)
         Vu = np.zeros(self.r)
         for index, row in Du.iterrows():
-            iid = row.item_id
+            iid = int(row.item_id)
             yi = self.Y[iid-1]
             rui = row.rating
             Au += yi[:,None] * yi[None,:]
@@ -141,7 +137,7 @@ class ALS_WR():
         Ai = ni * self.lmda * np.eye(self.r)
         Vi = np.zeros(self.r)
         for index, row in Di.iterrows():
-            uid = row.user_id
+            uid = int(row.user_id)
             xu = self.X[uid-1]
             rui = row.rating
             Ai += xu[:,None] * xu[None,:]
