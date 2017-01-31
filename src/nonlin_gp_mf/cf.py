@@ -2,6 +2,7 @@ import sys
 import os
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
 import time
 
@@ -32,7 +33,7 @@ class GpMf():
         likelihood = - 0.5 * (Nj * np.log(2 * math.pi) + logDetC + yj.T.dot(Cj_invy))
         return float(likelihood)
 
-    def invert_covariance(self, gradient=False, nonlinear = False, kernel=linear_kernel):
+    def invert_covariance(self, gradient=False, nonlinear =False, kernel=linear_kernel):
         q = self.latent_dim
         Nj = len(self.rated_items)
         Xj = np.asmatrix(self.X[self.rated_items, :])
@@ -162,8 +163,7 @@ def predict(user, test_items, model, dataset):
     return mean
 
 
-def perf_weak(dataset=DataSet(dataset="movielens", size="M"), base_dim=11):
-
+def perf_weak(dataset, base_dim=11):
     if dataset.dataset == "movielens":
         norm_coeff = 1.6
     else :
@@ -194,7 +194,52 @@ def perf_weak(dataset=DataSet(dataset="movielens", size="M"), base_dim=11):
     nmae = np.sum(np.abs(true_ratings - predictions)) * 1. / (len(predictions) * norm_coeff)
     print("rmse", rmse)
     print("nmae", nmae)
-    return rmse, nmae
+    return float(rmse), float(nmae)
+
+# ========================== DEMO ======================================================================================
+def plot_errors_vs_latent_dims():
+    base_dims = range(5, 20)
+    rmse_res = []
+        #0.9192805345815771, 0.9191762806556765, 0.9298582192495648, 0.9264887573748214, 0.942721413670847,
+        #0.9464276649204383, 0.9619938797137044, 0.959524838407498, 0.9637647705458857, 0.9654112679112156,
+        #0.964014562524729, 0.9828162923399141, 0.9791815989138641, 0.9755912980143179, 0.9909916313775403]
+    nmae_res = []
+        #0.44971496453721255, 0.44916990674349777, 0.4520802986328138, 0.45121143493891314, 0.45841600020196077,
+        #0.4600831341641973, 0.46819195277564857, 0.4653186575931832, 0.4675059307434209, 0.46521752440367997,
+        #0.4693989965956004, 0.4749311584164483, 0.47302261002602103, 0.47072878663284334, 0.4775780782441432]
+
+    if not len(rmse_res):
+        dataset_movielens_s = DataSet(dataset="movielens", size="S")
+        for dim in base_dims:
+            (rmse, nmae) = perf_weak(dataset=dataset_movielens_s, base_dim=dim)
+            rmse_res.append(rmse)
+            nmae_res.append(nmae)
+
+        print(rmse_res)
+        print(nmae_res)
+
+    plt.figure()
+    plt.plot(base_dims, rmse_res, marker='.')
+    plt.grid()
+    plt.xlabel('Number of latent dimensions ($r$)')
+    plt.ylabel('RMSE (MovieLens 100k)')
+    plt.show()
+
+    plt.figure()
+    plt.plot(base_dims, nmae_res, marker='*')
+    plt.xlabel('Number of latent dimensions ($r$)')
+    plt.ylabel('NMAE (MovieLens 100k)')
+    plt.grid()
+    plt.show()
 
 
-perf_weak()
+if __name__ == "__main__":
+    # MovieLens dataset 100k
+    perf_weak(dataset=DataSet(dataset="movielens", size="M"))
+    # MovieLens dataset 1M
+    #perf_weak(dataset=DataSet(dataset="movielens", size="M"))
+    # Toy dataset
+    #perf_weak(dataset=DataSet(dataset="toy"))
+    # Jester dataset
+    #perf_weak(dataset=DataSet(dataset="jester"))
+    
