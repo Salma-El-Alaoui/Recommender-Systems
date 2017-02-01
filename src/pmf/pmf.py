@@ -214,14 +214,14 @@ if __name__ == "__main__":
     print('END')
     
     # Plot train and test errors
-    #plt.plot(range(pmf.maxepoch), pmf.train_rmse, marker='o', label='Training Data')
-    #plt.plot(range(pmf.maxepoch), pmf.test_rmse, marker='v', label='Test Data')
-    #plt.title('Learning Curve')
-    #plt.xlabel('Number of Epochs')
-    #plt.ylabel('RMSE')
-    #plt.legend()
-    #plt.grid()
-    #plt.show()
+    plt.plot(range(pmf.maxepoch), pmf.train_rmse, marker='o', label='Training Data')
+    plt.plot(range(pmf.maxepoch), pmf.test_rmse, marker='v', label='Test Data')
+    plt.title('Learning Curve')
+    plt.xlabel('Number of Epochs')
+    plt.ylabel('RMSE')
+    plt.legend()
+    plt.grid()
+    plt.show()
     
     
     """
