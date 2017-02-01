@@ -190,29 +190,39 @@ for movielens:
 The parameters can be modified either on _init or using pmf(...)
 """
 if __name__ == "__main__":
-    
+    print('START')
     #Compute the RMSE by epoch as well as the excecution and epoch times
+    print('Compute the RMSE by epoch as well as the excecution and epoch times...')
     pmf = PMF()
     #ds = DataSet(dataset='movielens', size ='S')
+    print('Fetch dataset...')
     ds = DataSet(dataset='jester')
     #ds = DataSet(dataset='toy')
+    print('Dataset fetched')
     ds_v= ds.get_df()
     ratings = ds_v.values
-    print(len(np.unique(ratings[:, 0])), len(np.unique(ratings[:, 1])), pmf.num_latent_feat)
+    print('Get dataset description...')
+    print(ds.get_description())
+    #print(len(np.unique(ratings[:, 0])), len(np.unique(ratings[:, 1])), pmf.num_latent_feat)
+    print("Split set in training and test set...")
     train_init, test_init, _ = ds.split_train_test(strong_generalization=False, train_size = 0.8)
+    print("Set splitted")
     train = train_init.values
     test = test_init.values
+    print('Fit the model...')
     pmf.fit(train, test)
+    print('Model fitted')
+    print('END')
     
     # Plot train and test errors
-    plt.plot(range(pmf.maxepoch), pmf.train_rmse, marker='o', label='Training Data')
-    plt.plot(range(pmf.maxepoch), pmf.test_rmse, marker='v', label='Test Data')
-    plt.title('Learning Curve')
-    plt.xlabel('Number of Epochs')
-    plt.ylabel('RMSE')
-    plt.legend()
-    plt.grid()
-    plt.show()
+    #plt.plot(range(pmf.maxepoch), pmf.train_rmse, marker='o', label='Training Data')
+    #plt.plot(range(pmf.maxepoch), pmf.test_rmse, marker='v', label='Test Data')
+    #plt.title('Learning Curve')
+    #plt.xlabel('Number of Epochs')
+    #plt.ylabel('RMSE')
+    #plt.legend()
+    #plt.grid()
+    #plt.show()
     
     
     """
