@@ -8,16 +8,16 @@
 AUTHORS
 -------
 
-Salma El Alaoui
-Olivier Chancé
-Sophia Lazraq
-Liu Zhengying
+Salma El Alaoui,
+Olivier Chancé,
+Sophia Lazraq,
+Liu Zhengying,
 
 STRUCTURES
 ----------
 
-- README.md
-- src/
+- README.md \n
+- src/ \n
  	-> ALS_WR/
  		-> als_wr.py
  	-> nonlin_gp_mf/
