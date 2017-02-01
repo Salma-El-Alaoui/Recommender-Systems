@@ -1,7 +1,7 @@
 # Recommender-Systems
 
    --------------------------------------------------
--- Collaborative Filtering using Matrix Factorization --
+   Collaborative Filtering using Matrix Factorization
    --------------------------------------------------
 
 
