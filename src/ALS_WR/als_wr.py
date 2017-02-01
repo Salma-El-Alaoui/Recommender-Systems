@@ -68,19 +68,14 @@ class ALS_WR():
         # variables memorizing the information after each iteration
         self.n_iter_carried_out = 0
         self.time_for_each_iter = []
-        self.pred()
-        initial_testing_RMSE = self.get_testing_RMSE()
-        initial_training_RMSE = self.get_training_RMSE()
-        self.RMSE_train_after_each_iter = [initial_training_RMSE]
-        self.RMSE_test_after_each_iter = [initial_testing_RMSE]
+        self.RMSE_train_after_each_iter = []
+        self.RMSE_test_after_each_iter = []
 
 
     def fit(self,n_iter=10):
         t0 = time.time()
-        print("ALS-WR begins...")
+        print("\nALS-WR begins...")
         print("with r = %d, lmda = %.3f" % (self.r,self.lmda))
-        print("Initial training RMSE: %.4f" % self.RMSE_train_after_each_iter[0])
-        print("Initial testing RMSE: %.4f" % self.RMSE_test_after_each_iter[0])
         
         # Parallel computation
         pool = multiprocessing.Pool()
@@ -124,6 +119,7 @@ class ALS_WR():
         print("Final training RMSE: %.4f" % final_training_rmse)
         print("Final testing RMSE: %.4f" % final_testing_rmse)
         pool.close()
+        pool.terminate()
         pool.join()
         
         
@@ -183,8 +179,8 @@ class ALS_WR():
         return rmse
 
     def plot_RMSE(self):
-        plt.plot(self.RMSE_train_after_each_iter, marker='o', label='Training RMSE')
-        plt.plot(self.RMSE_test_after_each_iter, marker='v', label='Testing RMSE')
+        plt.plot(range(1,self.n_iter_carried_out+1),self.RMSE_train_after_each_iter, marker='o', label='Training RMSE')
+        plt.plot(range(1,self.n_iter_carried_out+1),self.RMSE_test_after_each_iter, marker='v', label='Testing RMSE')
         plt.title('ALS-WR with r=%d and $\lambda$=%.3f' % (self.r,self.lmda))
         plt.xlabel('Number of iterations')
         plt.ylabel('RMSE')
@@ -195,18 +191,31 @@ class ALS_WR():
     def get_average_time(self):
         return np.average(self.time_for_each_iter)
 
-def perf_weak(dataset="movielens",size="M"):
-    DataSet(dataset="movielens", size="M")
+def perf_weak(dataset="movielens",size="M",r=100,lmda=0.065,n_iter=10):
+    ds = DataSet(dataset=dataset, size=size)
+    train_df, test_df, _ = ds.split_train_test(False)
+    als = ALS_WR(train_df,test_df,r=r,lmda=lmda)
+    als.fit(n_iter=n_iter)
+    
+    print("\n\n########################### Analysis ###########################")
+    print("The RMSE curve for dataset=\"%s\", size=\"%s\" is" % (dataset,size))
+    als.plot_RMSE()
+    print("Number of iteration carried out: %d" % als.n_iter_carried_out)
+    print("Average time for each iteration: %.2f" % als.get_average_time())
+    print("Final training RMSE: %.4f" % als.RMSE_train_after_each_iter[-1])
+    print("Final testing RMSE: %.4f" % als.RMSE_test_after_each_iter[-1])
+    
 
 if __name__ == "__main__":
-    pass
+    # MovieLens dataset 100k
+    # perf_weak(dataset="movielens",size="S",r=10,lmda=0.065,n_iter=20)
+    
+    # Toy dataset
+    perf_weak(dataset="toy",r=20,lmda=0.065,n_iter=20)
+    
+     
+    #perf_weak(dataset="movielens",size="M",r=10,lmda=0.065,n_iter=10)
+    
+            
+    
 
-
-def plot_RMSE(rmse_list):
-    plt.plot(rmse_list, marker='v', label='Testing RMSE')
-    plt.title('ALS-WR with r=100 and $\lambda=0.065$')
-    plt.xlabel('Number of iterations')
-    plt.ylabel('RMSE')
-    plt.legend()
-    plt.grid()
-    plt.show()

@@ -242,7 +242,7 @@ def plot_errors_vs_latent_dims():
 
 if __name__ == "__main__":
     # MovieLens dataset 100k
-    perf_weak(dataset=DataSet(dataset="movielens", size="M"))
+    perf_weak(dataset=DataSet(dataset="movielens", size="S"))
     # MovieLens dataset 1M
     #perf_weak(dataset=DataSet(dataset="movielens", size="M"))
     # Toy dataset
