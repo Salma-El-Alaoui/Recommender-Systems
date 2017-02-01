@@ -194,9 +194,8 @@ if __name__ == "__main__":
     #Compute the RMSE by epoch as well as the excecution and epoch times
     print('Compute the RMSE by epoch as well as the excecution and epoch times...')
     pmf = PMF()
-    #ds = DataSet(dataset='movielens', size ='S')
     print('Fetch dataset...')
-    ds = DataSet(dataset='jester')
+    ds = DataSet(dataset='movielens', size ='S')
     #ds = DataSet(dataset='toy')
     print('Dataset fetched')
     ds_v= ds.get_df()
