@@ -198,7 +198,7 @@ def perf_weak(dataset="movielens",size="M",r=100,lmda=0.065,n_iter=10):
     print('Dataset fetched')
     print('Split set in training and test sets...')
     train_df, test_df, _ = ds.split_train_test(False)
-    print('Data set splitted')
+    print('Data set is split')
     als = ALS_WR(train_df,test_df,r=r,lmda=lmda)
     print('Fit the model...')
     als.fit(n_iter=n_iter)
