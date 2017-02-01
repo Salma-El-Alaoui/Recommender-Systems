@@ -20,15 +20,15 @@ STRUCTURES
 - src/ 
  	- ALS_WR/
  		- als_wr.py
- 	-> nonlin_gp_mf/
- 		-> cf.py
- 		-> __init__.py
- 	-> pmf/
- 		-> pmf.py
- 		-> __init__.py
- 	-> data_fetching/
- 		-> data_set.py
- 		-> __init__.py
+ 	- nonlin_gp_mf/
+ 		- cf.py
+ 		- __init__.py
+ 	- pmf/
+ 		- pmf.py
+ 		- __init__.py
+ 	- data_fetching/
+ 		- data_set.py
+ 		- __init__.py
 
 GENERAL INFORMATION
 -------------------
