@@ -208,13 +208,16 @@ def perf_weak(dataset="movielens",size="M",r=100,lmda=0.065,n_iter=10):
 
 if __name__ == "__main__":
     # MovieLens dataset 100k
-    # perf_weak(dataset="movielens",size="S",r=10,lmda=0.065,n_iter=20)
+    perf_weak(dataset="movielens",size="S",r=10,lmda=0.065,n_iter=20)
     
     # Toy dataset
-    perf_weak(dataset="toy",r=20,lmda=0.065,n_iter=20)
+    # perf_weak(dataset="toy",r=20,lmda=0.065,n_iter=20)
     
-     
-    #perf_weak(dataset="movielens",size="M",r=10,lmda=0.065,n_iter=10)
+    # MovieLens dataset 1M
+    #perf_weak(dataset="movielens",size="M",r=100,lmda=0.065,n_iter=10)
+    
+    # Jester dataset
+    #perf_weak(dataset="jester",r=100,lmda=0.065,n_iter=10)
     
             
     
