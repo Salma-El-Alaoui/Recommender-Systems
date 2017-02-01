@@ -203,9 +203,7 @@ def perf_weak(dataset="movielens",size="M",r=100,lmda=0.065,n_iter=10):
     train_df, test_df, _ = ds.split_train_test(False)
     print('Data set is split')
     als = ALS_WR(train_df,test_df,r=r,lmda=lmda)
-    print('Fit the model...')
     als.fit(n_iter=n_iter)
-    print('The model is fitted')
     
     print("\n\n########################### Analysis ###########################")
     print("The RMSE curve for dataset=\"%s\", size=\"%s\" is" % (dataset,size))
@@ -222,15 +220,11 @@ if __name__ == "__main__":
     perf_weak(dataset="movielens",size="S",r=10,lmda=0.065,n_iter=20)
     
     # Toy dataset
-<<<<<<< HEAD
     # perf_weak(dataset="toy",r=20,lmda=0.065,n_iter=20)
     
     # MovieLens dataset 1M.
     # Attention: slow, ~200 seconds per iteration
     # perf_weak(dataset="movielens",size="M",r=100,lmda=0.065,n_iter=10)
-=======
-    #perf_weak(dataset="toy",r=20,lmda=0.065,n_iter=20)
->>>>>>> origin/master
     
     # Jester dataset
     # Attention: very slow, ~400 seconds per iteration
