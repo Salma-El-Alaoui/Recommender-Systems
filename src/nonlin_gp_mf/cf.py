@@ -171,13 +171,17 @@ def predict(user, test_items, model, dataset):
 
 
 def perf_weak(dataset, base_dim=11):
+    print('Fetch data set...')
     if dataset.dataset == "movielens":
         norm_coeff = 1.6
     else :
         norm_coeff = 6.67
-    print("dataset desctiption", dataset.get_description())
+    print('Data set fetched')
+    print("Dataset desctiption", dataset.get_description())
     model_init = GpMf(latent_dim=base_dim, nb_data=dataset.item_index_range)
+    print('Fit the model...')
     model = fit(dataset=dataset, model=model_init)
+    print('Model fitted')
     predictions = []
     true_ratings = []
     test_users = dataset.get_users_test()
@@ -241,11 +245,14 @@ def plot_errors_vs_latent_dims():
 
 
 if __name__ == "__main__":
+    print('START')
+    plot_errors_vs_latent_dims()
     # MovieLens dataset 100k
-    perf_weak(dataset=DataSet(dataset="movielens", size="S"))
+    #perf_weak(dataset=DataSet(dataset="movielens", size="S"))
     # MovieLens dataset 1M
     #perf_weak(dataset=DataSet(dataset="movielens", size="M"))
     # Toy dataset
     #perf_weak(dataset=DataSet(dataset="toy"))
     # Jester dataset
     #perf_weak(dataset=DataSet(dataset="jester"))
+    print('END')
