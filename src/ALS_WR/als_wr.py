@@ -25,6 +25,9 @@ class ALS_WR():
     """
     // How to use //
     
+    For demonstration, run this script under spyder directly, choosing 
+    which dataset in __main__ by commenting and decommenting
+    
     Let traind_df, test_df be two pandas.DataFrame objects with 3 columns [user_id,item_id,rating]
 
     Initialize the class with:
@@ -213,10 +216,12 @@ if __name__ == "__main__":
     # Toy dataset
     # perf_weak(dataset="toy",r=20,lmda=0.065,n_iter=20)
     
-    # MovieLens dataset 1M
-    #perf_weak(dataset="movielens",size="M",r=100,lmda=0.065,n_iter=10)
+    # MovieLens dataset 1M.
+    # Attention: slow, ~200 seconds per iteration
+    # perf_weak(dataset="movielens",size="M",r=100,lmda=0.065,n_iter=10)
     
     # Jester dataset
+    # Attention: very slow, ~400 seconds per iteration
     #perf_weak(dataset="jester",r=100,lmda=0.065,n_iter=10)
     
             
