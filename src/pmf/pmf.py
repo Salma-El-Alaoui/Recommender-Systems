@@ -30,8 +30,8 @@ sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 from data_fetching.data_set import DataSet
 
 class PMF(object):
-    def __init__(self, num_latent_feat=100, learning_rate=1, _lambda=0.1, momentum=0.9, maxepoch=10, num_batches=100,
-                 batch_size=10000):
+    def __init__(self, num_latent_feat=20, learning_rate=1, _lambda=0.1, momentum=0.95, maxepoch=20, num_batches=100,
+                 batch_size=1000):
         """
         @Parameters:
         ------------
