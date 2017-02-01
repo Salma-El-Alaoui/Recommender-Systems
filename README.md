@@ -69,7 +69,8 @@ are presented:
   train_df, test_df = ds.get_df_train(), ds.get_df_test()
 
 ### pmf.py
-pmf.py implements Probabilistic Matrix factorization with fixed priors
+pmf.py implements Probabilistic Matrix factorization with fixed priors.
+
 In src/pmf/, run in the terminal:
 > python pmf.py
 
@@ -77,7 +78,8 @@ It will compute the RMSE by epoch as well as the excecution and epoch times
 for dataset='movielens', size='S'
 
 ### als_wr.py
-als_wr.py implements Alternating-Least-Squares with Weighted-λ-Regularization
+als_wr.py implements Alternating-Least-Squares with Weighted-λ-Regularization.
+
 In src/ALS_WR/, run in the terminal:
 > python als_wr.py
 
@@ -85,7 +87,8 @@ It will compute the RMSE by epoch as well as the excecution and epoch times
 for dataset='movielens', size='S'
 
 ### cf.py.py
-cf.py implements Non-linear Matrix Factorization with Gaussian Processes (NLMFGP)
+cf.py implements Non-linear Matrix Factorization with Gaussian Processes (NLMFGP).
+
 In src/nonlin_gp_mf/, run in the terminal:
 > python pmf.py
 
