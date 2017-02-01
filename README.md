@@ -1,8 +1,8 @@
 # Recommender-Systems
 
-   --------------------------------------------------
-   Collaborative Filtering using Matrix Factorization
-   --------------------------------------------------
+ --------------------------------------------------
+ Collaborative Filtering using Matrix Factorization
+ --------------------------------------------------
 
 
 AUTHORS
@@ -16,10 +16,10 @@ Liu Zhengying,
 STRUCTURES
 ----------
 
-- README.md \n
-- src/ \n
- 	-> ALS_WR/
- 		-> als_wr.py
+- README.md 
+- src/ 
+ 	- ALS_WR/
+ 		- als_wr.py
  	-> nonlin_gp_mf/
  		-> cf.py
  		-> __init__.py
