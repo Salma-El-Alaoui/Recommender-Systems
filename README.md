@@ -72,6 +72,7 @@ are presented:
 pmf.py implements Probabilistic Matrix factorization with fixed priors
 In src/pmf/, run in the terminal:
 > python pmf.py
+
 It will compute the RMSE by epoch as well as the excecution and epoch times
 for dataset='movielens', size='S'
 
@@ -79,6 +80,7 @@ for dataset='movielens', size='S'
 als_wr.py implements Alternating-Least-Squares with Weighted-λ-Regularization
 In src/ALS_WR/, run in the terminal:
 > python als_wr.py
+
 It will compute the RMSE by epoch as well as the excecution and epoch times
 for dataset='movielens', size='S'
 
@@ -86,6 +88,7 @@ for dataset='movielens', size='S'
 cf.py implements Non-linear Matrix Factorization with Gaussian Processes (NLMFGP)
 In src/nonlin_gp_mf/, run in the terminal:
 > python pmf.py
+
 The dataset used for this one is movielens too, with size='S'
 
 For each method, only a few dataset/options are tested in order to reduce the calculation time
