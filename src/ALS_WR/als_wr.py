@@ -192,10 +192,17 @@ class ALS_WR():
         return np.average(self.time_for_each_iter)
 
 def perf_weak(dataset="movielens",size="M",r=100,lmda=0.065,n_iter=10):
+    print('START')
+    print('Fetch Dataset...')
     ds = DataSet(dataset=dataset, size=size)
+    print('Dataset fetched')
+    print('Split set in training and test sets...')
     train_df, test_df, _ = ds.split_train_test(False)
+    print('Data set splitted')
     als = ALS_WR(train_df,test_df,r=r,lmda=lmda)
+    print('Fit the model...')
     als.fit(n_iter=n_iter)
+    print('The model is fitted')
     
     print("\n\n########################### Analysis ###########################")
     print("The RMSE curve for dataset=\"%s\", size=\"%s\" is" % (dataset,size))
@@ -204,6 +211,7 @@ def perf_weak(dataset="movielens",size="M",r=100,lmda=0.065,n_iter=10):
     print("Average time for each iteration: %.2f" % als.get_average_time())
     print("Final training RMSE: %.4f" % als.RMSE_train_after_each_iter[-1])
     print("Final testing RMSE: %.4f" % als.RMSE_test_after_each_iter[-1])
+    print('END')
     
 
 if __name__ == "__main__":
