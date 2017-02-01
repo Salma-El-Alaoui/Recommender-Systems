@@ -246,13 +246,13 @@ def plot_errors_vs_latent_dims():
 
 if __name__ == "__main__":
     print('START')
-    plot_errors_vs_latent_dims()
     # MovieLens dataset 100k
-    #perf_weak(dataset=DataSet(dataset="movielens", size="S"))
+    perf_weak(dataset=DataSet(dataset="movielens", size="S"))
     # MovieLens dataset 1M
     #perf_weak(dataset=DataSet(dataset="movielens", size="M"))
     # Toy dataset
     #perf_weak(dataset=DataSet(dataset="toy"))
     # Jester dataset
     #perf_weak(dataset=DataSet(dataset="jester"))
+    # plot_errors_vs_latent_dims()
     print('END')
